@@ -1,3 +1,6 @@
+# I don't want pdf files sent up
+*.pdf
+
 # Prerequisites
 *.d
 
