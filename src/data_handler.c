@@ -168,8 +168,6 @@ void bst_insertData(bst_t* bst, double* data) {
 	assert(newNode->right!=NULL);
 	newNode->d = data;
 	
-	
-	
 	int i=0;
 	for (i=0; i<bst->dim; i++) {
 		if (bst->root[i] == NULL) {

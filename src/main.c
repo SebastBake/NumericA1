@@ -31,7 +31,8 @@ int main(int argc, char *argv[]) {
 	/* TODO: Add timing for each task and output running time in ms */
 
 	/* Task 0: Parse input file */
-	parseFlowFile(flowFileName);
+	bst_t* bst = parseFlowFile(flowFileName);
+	bst_printTree(bst, 0);
 	
     
 	/* Task 1: Find the maximum velocity difference */
