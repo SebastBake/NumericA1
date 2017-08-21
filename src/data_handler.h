@@ -38,8 +38,15 @@ int parseFlowFileLine(bst_t* bst, FILE* fp);
 
 bst_t* bst_newTree();
 node_t* bst_newNode();
+
+void bst_freeNode(node_t* node);
+void bst_freeTree(bst_t* bst);
+
+void bst_printNode(bst_t* bst, node_t* node);
+void bst_printTree(bst_t* bst);
+
 void bst_insertNode(bst_t* bst, node_t* node);
 void bst_deleteNode(bst_t* bst, node_t* node);
-node_t* bst_searchRange(bst_t* bst, float loBound, float upBound, int dataCode);
+float** bst_searchRange(bst_t* bst, float loBound, float upBound, int dataCode);
 
 #endif

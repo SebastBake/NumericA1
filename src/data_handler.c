@@ -43,7 +43,7 @@ bst_t* parseFlowFile(char *filename) {
 	assert(fp != NULL);
 	bst_t* bst = bst_newTree();
 	
-	parseFirstLine(bst, fp); //printf("DIM: %d\n", bst->dim);
+	parseFirstLine(bst, fp);
 
 	while (parseFlowFileLine(bst, fp) != PARSE_FINISHED) {
 	}
@@ -57,28 +57,25 @@ int parseFlowFileLine(bst_t* bst, FILE* fp) {
 	
 	node_t* newNode = (node_t*)malloc(sizeof(node_t));
 	assert(newNode != NULL);
-
-	int dBytes = (bst->dim) * sizeof(float);
-	newNode->d = (float*)malloc(dBytes);
+	newNode->d = (float*)malloc(bst->dim*sizeof(float));
 	assert(newNode->d != NULL);
 
-	printf("READLINE: ");
-	int i = 0;
-	while ( fscanf(fp, "%f,", &((newNode->d)[i]) ) ) {
-		printf("%f ", newNode->d[i]);
-		i++;
+	int i = 0, read=0;
+	for (i=0; i < bst->dim; i++) {
+		read += fscanf(fp, "%f,", &(newNode->d[i]) );
 	}
-	printf("\n");
 
-	assert(fgetc(fp) == NEWLINE); // throw away new line
+	char endCheck = fgetc(fp); // throw away new line
 
-	if ( i==(bst->dim-1) ) {
+	if ( read==(bst->dim) && endCheck == NEWLINE) {
+		bst_printNode(bst, newNode);
 		// bst_insertNode(bst, newNode);
 		return !PARSE_FINISHED;
-	} else if ( i==0 ) {
+	} else if ( endCheck == EOF) {
+		bst_freeNode(newNode);
 		return PARSE_FINISHED;
 	} else {
-		printf("ERROR: partial parse, exiting...");
+		printf("ERROR: File parsing failed, exiting...");
 		exit(EXIT_FAILURE);
 	}
 }
@@ -94,7 +91,6 @@ int parseFirstLine(bst_t* bst, FILE* fp) {
 		tmpc = fgetc(fp);
 		if (tmpc == COMMA) { continue; }
 		if (tmpc == NEWLINE) { break; }
-		printf("C(%d): %c\n",i,tmpc);
 
 		bst->key[i] = tmpc;
 		bst->key = realloc(bst->key, (i+2)*(sizeof(char)));
@@ -104,6 +100,24 @@ int parseFirstLine(bst_t* bst, FILE* fp) {
 
 	bst->dim = i;
 	return bst->dim;
+}
+
+void bst_freeNode(node_t* node) {
+	free(node->d);
+	free(node);
+}
+
+void bst_printNode(bst_t* bst, node_t* node) {
+	printf("Node: ");
+	int i = 0;
+	for (i=0; i < bst->dim; i++) {
+		printf("%c=%f, ",bst->key[i], node->d[i] );
+	}
+	printf("\n");
+}
+
+void bst_insertNode(bst_t* bst, node_t* node) {
+
 }
 
 
