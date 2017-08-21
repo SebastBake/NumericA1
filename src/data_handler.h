@@ -12,6 +12,7 @@
 
 #define FILE_READONLY "r"
 #define PARSE_FINISHED 1
+#define MAX_KEY_SIZE 99
 #define NEWLINE '\n'
 #define COMMA ','
 
@@ -33,7 +34,7 @@ typedef struct {
 } bst_t;
 
 bst_t* parseFlowFile(char* filename);
-int parseFirstLine(bst_t* bst, FILE* fp);
+bst_t* parseFirstLine(FILE* fp);
 int parseFlowFileLine(bst_t* bst, FILE* fp);
 
 bst_t* bst_newTree();
