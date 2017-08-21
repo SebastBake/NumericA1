@@ -19,9 +19,9 @@
 typedef struct node node_t;
 
 struct node {
-    float* d;
-    node_t* left;
-    node_t* right;
+    double* d;
+    node_t** left;
+    node_t** right;
 };
 
 /* bst type */
@@ -29,7 +29,7 @@ typedef struct {
     int numNodes;
     int dim;
     char* key;
-    node_t* root;
+    node_t** root;
 } bst_t;
 
 bst_t* parseFlowFile(char* filename);
@@ -39,14 +39,12 @@ int parseFlowFileLine(bst_t* bst, FILE* fp);
 bst_t* bst_newTree();
 node_t* bst_newNode();
 
-void bst_freeNode(node_t* node);
 void bst_freeTree(bst_t* bst);
 
-void bst_printNode(bst_t* bst, node_t* node);
-void bst_printTree(bst_t* bst);
+void bst_printData(bst_t* bst, double* data);
+void bst_printTree(bst_t* bst, int dataIndex);
 
-void bst_insertNode(bst_t* bst, node_t* node);
-void bst_deleteNode(bst_t* bst, node_t* node);
-float** bst_searchRange(bst_t* bst, float loBound, float upBound, int dataCode);
+void bst_insertData(bst_t* bst, double* data);
+float** bst_searchRange(bst_t* bst, double loBound, double upBound, int dataIndex);
 
 #endif

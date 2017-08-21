@@ -12,7 +12,7 @@ CFLAGS=-Wall -Werror
 OUT=bin/flow
 SRC=src/data_handler.o src/tasks.o src/main.o
 
-all: clean compile clean
+all: compile clean
 
 compile: $(SRC)
 	$(CC) $(SRC) $(CFLAGS) -o $(OUT);
@@ -20,5 +20,5 @@ compile: $(SRC)
 clean:
 	rm -f src/*.o;
 
-run: clean compile clean
+run:
 	bin/flow data/flow_data.csv 128;
