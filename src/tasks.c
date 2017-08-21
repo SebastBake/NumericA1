@@ -11,26 +11,32 @@
 #include <sys/time.h>
 #include <string.h>
 #include "tasks.h"
+#include "data_handler.h"
 
-void maxveldiff(const char* flow_file)
+#define BST_X 0
+#define BST_Y 1
+#define BST_U 2
+#define BST_V 3
+
+void maxveldiff(const bst_t* data)
 {
     printf("maxveldiff() - IMPLEMENT ME!\n");
     exit(EXIT_FAILURE);
 }
 
-void coarsegrid(const char* flow_file, int resolution)
+void coarsegrid(const bst_t* data, int resolution)
 {
     printf("coarsegrid() - IMPLEMENT ME!\n");
     exit(EXIT_FAILURE);
 }
 
-void velstat(const char* flow_file)
+void velstat(const bst_t* data)
 {
     printf("velstat() - IMPLEMENT ME!\n");
     exit(EXIT_FAILURE);
 }
 
-void wakevis(const char* flow_file)
+void wakevis(const bst_t* data)
 {
     printf("wakevis() Part 1 - IMPLEMENT ME!\n");
     int i,j;

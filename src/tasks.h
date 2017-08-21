@@ -1,19 +1,22 @@
 /***************************************************************************
  *
  *   File        : tasks.h
- *   Student Id  : <INSERT STUDENT ID HERE>
- *   Name        : <INSERT STUDENT NAME HERE>
+ *   Student Id  : 757931
+ *   Name        : Sebastian Baker
  *
  ***************************************************************************/
 
+#include "data_handler.h"
+
 #ifndef TASKS_H
+#define TASKS_H
 
-void maxveldiff(const char* flow_file);
+void maxveldiff(const bst_t* data);
 
-void coarsegrid(const char* flow_file, int resolution);
+void coarsegrid(const bst_t* data, int resolution);
 
-void velstat(const char* flow_file);
+void velstat(const bst_t* data);
 
-void wakevis(const char* flow_file);
+void wakevis(const bst_t* data);
 
 #endif

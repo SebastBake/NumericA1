@@ -12,26 +12,39 @@
 #include <sys/time.h>
 #include <string.h>
 #include "tasks.h"
+#include "data_handler.h"
+
+#define NUM_ARGS 3
+#define INPUT_INSTRUCTIONS "USAGE EXAMPLE: ./flow flow_data.csv 128"
 
 int main(int argc, char *argv[]) {
-	
-	/* TODO: Parse Command Line Arguments */
-	char* flow_file = NULL;
-	int resolution = 0;
+
+	/* Parse Command Line Arguments */
+	if (argc != NUM_ARGS) {
+		printf(INPUT_INSTRUCTIONS);
+		exit(EXIT_FAILURE);
+	}
+	char* flowFileName = argv[1];
+	int gridResolution = atoi(argv[2]);
+	printf("FILENAME: %s\nRESOLUTION: %d\n", flowFileName, gridResolution);
 
 	/* TODO: Add timing for each task and output running time in ms */
+
+	/* Task 0: Parse input file */
+	parseFlowFile(flowFileName);
+	
     
 	/* Task 1: Find the maximum velocity difference */
-	maxveldiff(flow_file);
+	//maxveldiff();
 	
 	/* Task 2: Coarser Grid */
-	coarsegrid(flow_file, resolution);
+	//coarsegrid(, gridResolution);
 	
 	/* Task 3: Statistics */
-	velstat(flow_file);
+	//velstat();
 	
 	/* Task 4: Wake height and visualisation */
-	wakevis(flow_file);
+	//wakevis();
     
 	return EXIT_SUCCESS;
 }
