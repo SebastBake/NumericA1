@@ -8,11 +8,11 @@
 
 
 CC=gcc
-CFLAGS=-Wall -Werror
+CFLAGS=-Wall -Werror -g
 OUT=bin/flow
 SRC=src/data_handler.o src/tasks.o src/main.o
 
-all: compile clean
+all: clean compile
 
 compile: $(SRC)
 	$(CC) $(SRC) $(CFLAGS) -o $(OUT);
@@ -20,5 +20,5 @@ compile: $(SRC)
 clean:
 	rm -f src/*.o;
 
-run:
-	bin/flow data/flow_data.csv 128;
+run: clean
+	bin/flow data/flow_data_shorter.csv 128;

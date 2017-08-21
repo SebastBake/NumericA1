@@ -32,7 +32,16 @@ int main(int argc, char *argv[]) {
 
 	/* Task 0: Parse input file */
 	bst_t* bst = parseFlowFile(flowFileName);
-	bst_printTree(bst, 0);
+	//bst_printTree(bst, 0);
+	//printf("\n\n");
+	results_t r = bst_searchRange(bst, -0.0038133, -0.0011562, 3);
+	int i;
+	for (i=0; i<r.n; i++) {
+		bst_printData(bst, r.arr[i]);
+	}
+
+	bst_freeTree(bst);
+	bst = NULL;
 	
     
 	/* Task 1: Find the maximum velocity difference */
