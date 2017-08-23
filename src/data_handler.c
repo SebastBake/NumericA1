@@ -1,6 +1,6 @@
 /***************************************************************************
  *
- *   File        : data_handler.h
+ *   File        : data_handler.c
  *   Student Id  : 757931
  *   Name        : Sebastian Baker
  *
@@ -13,33 +13,205 @@
 #include <assert.h>
 #include "data_handler.h"
 
+/* * * * * * * * * * * * * * * * * * * * * * *  PRIVATE FUNCTION DECLARATIONS */
+
+// Recursive functions and functions which deal directly with nodes should not 
+// be public.
+static node_t* bst_newNode(int dim, double* data);
+static void bst_freeNode(node_t* node);
+static void bst_insertNode_Rec(node_t* root, node_t* newNode, int dataIndex);
+static int bst_printTree_Rec(bst_t* bst, node_t* root, int dataIndex);
+static int bst_freeTree_Rec(node_t* root, int dataIndex);
+static int bst_searchRange_Rec(node_t* node, results_t *f);
 
 
 
 
+/* * * * * * * * * * * * * * * * * * * * * * * * * * * * *  PARSING FUNCTIONS */
+
+// Returns bst containing data from the flow file
+bst_t* parseFlowFile(char *filename) {
+
+	assert(filename!=NULL);
+	
+	FILE* fp = fopen(filename, FILE_READONLY);
+	assert(fp != NULL);
+	
+	bst_t* bst = parseFlowFileFirstLine(fp);
+	
+	while (parseFlowFileDataLine(bst, fp) != PARSE_FINISHED) {
+	}
+
+	fclose(fp);
+
+	return bst;
+}
+
+// Parses first line of flow file to get:
+//  1. key (eg: {'x','y','u','v'}) and
+//  2. number of dimensions (eg: 4 data entries for each line in the csv)
+// Uses the key and number of dimensions to generate an empty bst
+bst_t* parseFlowFileFirstLine(FILE* fp) {
+	
+	assert(fp!=NULL);
+
+	char* key = (char* )malloc( sizeof(char) );
+	assert(key != NULL);
+
+	char tmpc;
+	int i = 0;
+	while (1) {
+
+		tmpc = fgetc(fp);
+		if (tmpc == COMMA) { continue; }
+		if (tmpc == NEWLINE) { break; }
+
+		key = (char*)realloc( key, (i+2) * sizeof(char) );
+		assert(key != NULL);
+		key[i] = tmpc;
+		i++;
+	}
+
+	bst_t* bst = bst_newTree(i, key);
+
+	return bst;
+}
+
+// Parses a data entry from flow file, inserts it into bst
+int parseFlowFileDataLine(bst_t* bst, FILE* fp) {
+
+	assert(bst!=NULL);
+	assert(fp!=NULL);
+	
+	// Store the data in an array
+	double* data = (double*)calloc(bst->dim, sizeof(double));
+	assert(data != NULL);
+	
+	// Read the line
+	int i = 0, read=0;
+	for (i=0; i < bst->dim; i++) {
+		read += fscanf(fp, "%lf,", &(data[i]) );
+	}
+
+	// Decide whether to insert data, finish parsing, or detect a file error
+	char endCheck = fgetc(fp);
+	if ( read==(bst->dim) && endCheck == NEWLINE) {
+		bst_insertData(bst, data);
+		return !PARSE_FINISHED;
+	} else if ( endCheck == EOF) {
+		free(data);
+		return PARSE_FINISHED;
+	} else {
+		printf("ERROR: File parsing failed, exiting...");
+		exit(EXIT_FAILURE);
+	}
+}
 
 
 
 
+/* * * * * * * * * * * * * * * * * * * * * * *  PUBLIC BST AND DATA FUNCTIONS */
+
+// Generate a new empty bst
+bst_t* bst_newTree(int dim, char* key) {
+
+	assert(key!=NULL);
+	
+	bst_t* bst = (bst_t*)malloc(sizeof(bst_t));
+	assert(bst != NULL);
+
+	bst->numNodes = 0;
+	bst->dim = dim;
+	bst->key = key;
+	bst->root = (node_t**)calloc( bst->dim, sizeof(node_t*) );
+	assert(bst->root != NULL);
+
+	return bst;
+}
+
+// Frees memory associated with a tree, including the data contained in the tree
+int bst_freeTree(bst_t* bst) {
+
+	assert(bst!=NULL);
+
+	int freed = bst_freeTree_Rec(bst->root[BST_ORDER_INDEX], BST_ORDER_INDEX);
+	assert(freed == bst->numNodes);
+	
+	free(bst->root);
+	free(bst->key);
+	free(bst);
+
+	return freed;
+}
+
+// Inserts a data array into the bst as a node
+void bst_insertData(bst_t* bst, double* data) {
+	
+	assert(bst!=NULL);
+	assert(data!=NULL);
+
+	node_t* newNode = bst_newNode(bst->dim, data);
+	
+	int i=0;
+	for (i=0; i<bst->dim; i++) {
+		if (bst->root[i] == NULL) {
+			bst->root[i] = newNode;
+		} else {
+			bst_insertNode_Rec(bst->root[i], newNode, i);
+		}
+	}
+
+	bst->numNodes++;
+}
+
+// Returns data items with a value between lo and hi, from a bst
+results_t bst_searchRange(bst_t* bst, double lo, double hi, int dataIndex) {
+
+	assert(bst!=NULL);
+	assert(lo<hi);
+	assert(dataIndex<bst->dim);
+
+	results_t found;
+	found.len = FOUND_LEN;
+	found.n = 0;
+	found.i = dataIndex;
+	found.lo = lo;
+	found.hi = hi;
+	found.arr = (double**)calloc(found.len, sizeof(double*));
+	assert(found.arr!=NULL);
+	bst_searchRange_Rec(bst->root[found.i], &found);
+
+	return found;
+}
+
+// Prints all of the items in order of low to high
+void bst_printTree(bst_t* bst, int dataIndex) {
+
+	assert(bst!=NULL);
+	assert(dataIndex < bst->dim);
+	bst_printTree_Rec(bst, bst->root[dataIndex], dataIndex);
+}
+
+// Prints a data entry
+void bst_printData(bst_t* bst, double* data) {
+
+	assert(bst!=NULL);
+	assert(data!=NULL);
+
+	printf("Node: ");
+	int i = 0;
+	for (i=0; i < bst->dim; i++) {
+		printf("%c=%f ", bst->key[i], data[i] );
+	}
+	printf("\n");
+}
 
 
 
 
+/* * * * * * * * * * * * * * * * * * * * * * * * * * * * *  PRIVATE FUNCTIONS */
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+// Generates a new node
 static node_t* bst_newNode(int dim, double* data) {
 	
 	node_t* newNode = (node_t*)malloc(sizeof(node_t));
@@ -47,6 +219,7 @@ static node_t* bst_newNode(int dim, double* data) {
 
 	newNode->left = (node_t**)calloc(dim, sizeof(node_t*));
 	assert(newNode->left != NULL);
+
 	newNode->right = (node_t**)calloc(dim, sizeof(node_t*));
 	assert(newNode->right != NULL);
 
@@ -56,6 +229,7 @@ static node_t* bst_newNode(int dim, double* data) {
 	return newNode;
 }
 
+// Frees a node
 static void bst_freeNode(node_t* node) {
 
 	assert(node != NULL);
@@ -69,6 +243,7 @@ static void bst_freeNode(node_t* node) {
 	free(node);
 }
 
+// Recursively insert a node
 static void bst_insertNode_Rec(node_t* root, node_t* newNode, int dataIndex) {
 
 	assert(root != NULL);
@@ -89,281 +264,64 @@ static void bst_insertNode_Rec(node_t* root, node_t* newNode, int dataIndex) {
 	}
 }
 
-static void bst_printTree_Rec(bst_t* bst, node_t* root, int dataIndex) {
+// Recursively print tree (in order traverse), returns number of items printed
+static int bst_printTree_Rec(bst_t* bst, node_t* root, int dataIndex) {
 
 	assert(bst != NULL);
+	assert(dataIndex < bst->dim);
 
+	int numPrinted = 0;
 	if (root!=NULL) {
-		bst_printTree_Rec(bst, root->left[dataIndex], dataIndex);
+		numPrinted++;
+		numPrinted += bst_printTree_Rec(bst, root->left[dataIndex], dataIndex);
 		bst_printData(bst, root->d);
-		bst_printTree_Rec(bst, root->right[dataIndex], dataIndex);
+		numPrinted += bst_printTree_Rec(bst, root->right[dataIndex], dataIndex);
 	}
+	return numPrinted;
 }
 
-static void bst_freeTree_Rec(node_t* root, int dataIndex) {
+// Recursively free a tree (post order traverse), returns number of items freed
+static int bst_freeTree_Rec(node_t* root, int dataIndex) {
 
+	int numFreed = 0;
 	if (root!=NULL) {
-		bst_freeTree_Rec(root->left[dataIndex], dataIndex);
-		bst_freeTree_Rec(root->right[dataIndex], dataIndex);
+		numFreed++;
+		numFreed += bst_freeTree_Rec(root->left[dataIndex], dataIndex);
+		numFreed += bst_freeTree_Rec(root->right[dataIndex], dataIndex);
 		bst_freeNode(root);
 	}
-
+	return numFreed;
 }
 
-void bst_searchRange_Rec(node_t* node, results_t *f) {
+// Recursively search a tree (in order traverse), returns number items searched
+static int bst_searchRange_Rec(node_t* node, results_t *f) {
 
 	assert(f!=NULL);
 
+	int searched = 0;
+
 	if (node!=NULL) {
+		searched++;
+		
 		if ( node->d[f->i] < f->lo ) {
-			//printf("searching recursively: found %f < lo=%f\n", node->d[f->i], f->lo);
-			bst_searchRange_Rec(node->right[f->i], f);
+			searched += bst_searchRange_Rec(node->right[f->i], f);
 		} else if (node->d[f->i] > f->hi ) {
-			//printf("searching recursively: found %f > hi=%f\n", node->d[f->i], f->hi);
-			bst_searchRange_Rec(node->left[f->i], f);
+			searched += bst_searchRange_Rec(node->left[f->i], f);
 		} else {
+			searched += bst_searchRange_Rec(node->left[f->i], f);
 			
-			// printf("Found: ");
-			// int i = 0;
-			// for (i=0; i < 4; i++) {
-			// 	printf("%f ", node->d[i] );
-			// }
-			// printf("\n");
-			
+			// insert the item into the results structure f
 			if (f->n >= f->len) {
 				f->len += FOUND_LEN;
 				f->arr = (double**)realloc(f->arr, f->len * sizeof(double*));
+				assert(f->arr != NULL);
 			}
 			f->arr[f->n] = node->d;
 			f->n++;
 
-			bst_searchRange_Rec(node->left[f->i], f);
-			bst_searchRange_Rec(node->right[f->i], f);
-		}
-	}
-}
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-bst_t* parseFlowFile(char *filename) {
-
-	assert(filename!=NULL);
-	
-	FILE* fp = fopen(filename, FILE_READONLY);
-	assert(fp != NULL);
-	
-	bst_t* bst = parseFirstLine(fp);
-
-	//printf("parsing file...\n");
-	while (parseFlowFileLine(bst, fp) != PARSE_FINISHED) {
-	}
-
-	fclose(fp);
-
-	return bst;
-}
-
-bst_t* parseFirstLine(FILE* fp) {
-	
-	assert(fp!=NULL);
-
-	char* tmpkey = (char* )malloc( sizeof(char) );
-
-	char tmpc;
-	int i = 0;
-	while (1) {
-
-		tmpc = fgetc(fp);
-		if (tmpc == COMMA) { continue; }
-		if (tmpc == NEWLINE) { break; }
-
-		tmpkey = (char* )realloc(tmpkey, (i+2)* sizeof(char) );
-		tmpkey[i] = tmpc;
-		i++;
-	}
-
-	bst_t* bst = bst_newTree(i, tmpkey);
-	assert(bst!=NULL);
-
-	return bst;
-}
-	
-int parseFlowFileLine(bst_t* bst, FILE* fp) {
-
-	assert(bst!=NULL);
-	assert(fp!=NULL);
-	
-	double* data = (double*)malloc(bst->dim*sizeof(double));
-	assert(data != NULL);
-
-	int i = 0, read=0;
-	for (i=0; i < bst->dim; i++) {
-		read += fscanf(fp, "%lf,", &(data[i]) );
-	}
-
-	char endCheck = fgetc(fp); // throw away new line
-
-	if ( read==(bst->dim) && endCheck == NEWLINE) {
-		//bst_printData(bst, data);
-		bst_insertData(bst, data);
-		return !PARSE_FINISHED;
-	} else if ( endCheck == EOF) {
-		free(data);
-		return PARSE_FINISHED;
-	} else {
-		printf("ERROR: File parsing failed, exiting...");
-		exit(EXIT_FAILURE);
-	}
-}
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-bst_t* bst_newTree(int dim, char* key) {
-	
-	bst_t* bst = (bst_t*)malloc(sizeof(bst_t));
-	assert(bst != NULL);
-
-	bst->numNodes = 0;
-	bst->dim = dim;
-	bst->key = key;
-	bst->root = (node_t** )calloc( bst->dim, sizeof(node_t*) );
-
-	return bst;
-}
-
-void bst_freeTree(bst_t* bst) {
-
-	bst_freeTree_Rec(bst->root[DEFAULT_BST_FREE_ORDER_INDEX], DEFAULT_BST_FREE_ORDER_INDEX);
-
-	free(bst->root);
-	free(bst->key);
-	free(bst);
-
-}
-
-void bst_insertData(bst_t* bst, double* data) {
-	
-	assert(bst!=NULL);
-	assert(data!=NULL);
-
-	node_t* newNode = bst_newNode(bst->dim, data); //printf("made a node\n");
-	
-	int i=0;
-	for (i=0; i<bst->dim; i++) {
-		if (bst->root[i] == NULL) {
-			bst->root[i] = newNode; //printf("inserted head\n");
-		} else {
-			bst_insertNode_Rec(bst->root[i], newNode, i); //printf("inserted\n");
+			searched += bst_searchRange_Rec(node->right[f->i], f);
 		}
 	}
 
-	bst->numNodes++;
+	return searched;
 }
-
-results_t bst_searchRange(bst_t* bst, double loBound, double upBound, int dataIndex) {
-
-	assert(bst!=NULL);
-	assert(loBound<upBound);
-	assert(dataIndex<=bst->dim);
-
-	results_t found;
-	found.len = FOUND_LEN;
-	found.n = 0;
-	found.i = dataIndex;
-	found.lo = loBound;
-	found.hi = upBound;
-	found.arr = (double**)calloc(found.len, sizeof(double*));
-	assert(found.arr!=NULL);
-	//printf("start rec search(%d): lo=%f hi=%f\n", found.i, found.lo, found.hi);
-	bst_searchRange_Rec(bst->root[found.i], &found);
-	return found;
-}
-
-void bst_printTree(bst_t* bst, int dataIndex) {
-
-	assert(bst!=NULL);
-
-	bst_printTree_Rec(bst, bst->root[dataIndex], dataIndex);
-}
-
-void bst_printData(bst_t* bst, double* data) {
-
-	assert(bst!=NULL);
-	assert(data!=NULL);
-
-	printf("Node: ");
-	int i = 0;
-	for (i=0; i < bst->dim; i++) {
-		printf("%c=%f ", bst->key[i], data[i] );
-	}
-	printf("\n");
-}
-
-

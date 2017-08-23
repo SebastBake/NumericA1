@@ -21,4 +21,4 @@ clean:
 	rm -f src/*.o;
 
 run: clean
-	bin/flow data/flow_data_shorter.csv 128;
+	bin/flow data/flow_data.csv 128;

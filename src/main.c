@@ -31,16 +31,17 @@ int main(int argc, char *argv[]) {
 	/* TODO: Add timing for each task and output running time in ms */
 
 	/* Task 0: Parse input file */
+	printf("Parsing...\n");
 	bst_t* bst = parseFlowFile(flowFileName);
 	//bst_printTree(bst, 0);
-	//printf("\n\n");
+	printf("Searching...\n");
 	results_t r = bst_searchRange(bst, -0.0038133, -0.0011562, 3);
 	int i;
 	for (i=0; i<r.n; i++) {
 		bst_printData(bst, r.arr[i]);
 	}
 
-	bst_freeTree(bst);
+	printf("Freed: %d\n", bst_freeTree(bst));
 	bst = NULL;
 	
     

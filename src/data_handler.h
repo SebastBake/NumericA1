@@ -15,7 +15,7 @@
 #define MAX_KEY_SIZE 99
 #define NEWLINE '\n'
 #define COMMA ','
-#define DEFAULT_BST_FREE_ORDER_INDEX 0
+#define BST_ORDER_INDEX 0
 #define FOUND_LEN 10
 
 /* node type */
@@ -43,16 +43,16 @@ typedef struct Results_Struct {
 } results_t;
 
 bst_t* parseFlowFile(char* filename); // works
-bst_t* parseFirstLine(FILE* fp); // works
-int parseFlowFileLine(bst_t* bst, FILE* fp); // works
+bst_t* parseFlowFileFirstLine(FILE* fp); // works
+int parseFlowFileDataLine(bst_t* bst, FILE* fp); // works
 
 bst_t* bst_newTree(int dim, char* key); // works
-void bst_freeTree(bst_t* bst);
+int bst_freeTree(bst_t* bst);
 
 void bst_printData(bst_t* bst, double* data); // works
 void bst_printTree(bst_t* bst, int dataIndex); // works
 
 void bst_insertData(bst_t* bst, double* data); // works
-results_t bst_searchRange(bst_t* bst, double loBound, double upBound, int dataIndex);
+results_t bst_searchRange(bst_t* bst, double lo, double hi, int dataIndex);
 
 #endif
