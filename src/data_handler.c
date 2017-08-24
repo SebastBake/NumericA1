@@ -21,7 +21,7 @@ static void bst_freeNode(node_t* node);
 static void bst_insertNode_Itr(bst_t* bst, node_t* newNode, int dataIndex);
 
 // Recursive functions should be private 
-static void bst_insertNode_Rec(node_t* root, node_t* newNode, int dataIndex);
+//static void bst_insertNode_Rec(node_t* root, node_t* newNode, int dataIndex);
 static int bst_printTree_Rec(bst_t* bst, node_t* root, int dataIndex);
 static int bst_freeTree_Rec(bst_t* bst, node_t* root, int dataIndex);
 static int bst_searchRange_Rec(node_t* node, results_t *f);
@@ -37,62 +37,6 @@ static void bst_leftInnerRot(
 	node_t* parent, node_t* node_a, int dataIndex, int parentDirection);
 static void bst_rightInnerRot(
 	node_t* parent, node_t* node_a, int dataIndex, int parentDirection);
-
-// Simple Balancing Queue implementation
-typedef struct balanceStruct balanceNode_t;
-struct balanceStruct {
-	int dir;
-	node_t* parent;
-	node_t* insertHere;
-	balanceNode_t* next;
-};
-
-typedef struct {
-	balanceNode_t* root;
-	int numEl;
-} balanceQueue_t;
-
-static balanceQueue_t* queue_newQueue(){
-	balanceQueue_t* new = (balanceQueue_t*)malloc(sizeof(balanceQueue_t));
-	assert(new!=NULL);
-	new->numEl = 0;
-	return new;
-}
-
-static balanceNode_t* queue_newNode(int dir, node_t* parent, node_t* insertHere){
-
-	balanceNode_t* new = (balanceNode_t*)malloc(sizeof(balanceNode_t));
-	assert(new!=NULL);
-	
-	new->dir = dir;
-	new->parent = parent;
-	new->insertHere = insertHere;
-	new->next=NULL;
-
-	return new;
-}
-
-static void queue_push(balanceQueue_t* queue, balanceNode_t* insert){
-	assert(queue!=NULL);
-	assert(insert!=NULL);
-
-	insert->next = queue->root;
-	queue->root = insert;
-	queue->numEl++;
-}
-
-static balanceNode_t* queue_pop(balanceQueue_t* queue){
-	
-	assert(queue!=NULL);
-
-	if (queue->root != NULL) {
-		queue->numEl--;
-		balanceNode_t* root = queue->root;
-		queue->root = root->next;
-		return root;
-	}
-	return NULL;
-}
 
 
 
