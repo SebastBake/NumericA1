@@ -15,14 +15,84 @@
 
 /* * * * * * * * * * * * * * * * * * * * * * *  PRIVATE FUNCTION DECLARATIONS */
 
-// Recursive functions and functions which deal directly with nodes should not 
-// be public.
-static node_t* bst_newNode(int dim, double* data);
+// Functions which deal directly with nodes should be private
+static node_t* bst_newNode(int dim, float* data);
 static void bst_freeNode(node_t* node);
+static void bst_insertNode_Itr(bst_t* bst, node_t* newNode, int dataIndex);
+
+// Recursive functions should be private 
 static void bst_insertNode_Rec(node_t* root, node_t* newNode, int dataIndex);
 static int bst_printTree_Rec(bst_t* bst, node_t* root, int dataIndex);
-static int bst_freeTree_Rec(node_t* root, int dataIndex);
+static int bst_freeTree_Rec(bst_t* bst, node_t* root, int dataIndex);
 static int bst_searchRange_Rec(node_t* node, results_t *f);
+
+// Balancing functions should be private
+static void bst_balance(
+	node_t* parent, node_t* node_a, int dataIndex, int parentDirection);
+static void bst_leftOuterRot(
+	node_t* parent, node_t* node_a, int dataIndex, int parentDirection);
+static void bst_rightOuterRot(
+	node_t* parent, node_t* node_a, int dataIndex, int parentDirection);
+static void bst_leftInnerRot(
+	node_t* parent, node_t* node_a, int dataIndex, int parentDirection);
+static void bst_rightInnerRot(
+	node_t* parent, node_t* node_a, int dataIndex, int parentDirection);
+
+// Simple Balancing Queue implementation
+typedef struct balanceStruct balanceNode_t;
+struct balanceStruct {
+	int dir;
+	node_t* parent;
+	node_t* insertHere;
+	balanceNode_t* next;
+};
+
+typedef struct {
+	balanceNode_t* root;
+	int numEl;
+} balanceQueue_t;
+
+static balanceQueue_t* queue_newQueue(){
+	balanceQueue_t* new = (balanceQueue_t*)malloc(sizeof(balanceQueue_t));
+	assert(new!=NULL);
+	new->numEl = 0;
+	return new;
+}
+
+static balanceNode_t* queue_newNode(int dir, node_t* parent, node_t* insertHere){
+
+	balanceNode_t* new = (balanceNode_t*)malloc(sizeof(balanceNode_t));
+	assert(new!=NULL);
+	
+	new->dir = dir;
+	new->parent = parent;
+	new->insertHere = insertHere;
+	new->next=NULL;
+
+	return new;
+}
+
+static void queue_push(balanceQueue_t* queue, balanceNode_t* insert){
+	assert(queue!=NULL);
+	assert(insert!=NULL);
+
+	insert->next = queue->root;
+	queue->root = insert;
+	queue->numEl++;
+}
+
+static balanceNode_t* queue_pop(balanceQueue_t* queue){
+	
+	assert(queue!=NULL);
+
+	if (queue->root != NULL) {
+		queue->numEl--;
+		balanceNode_t* root = queue->root;
+		queue->root = root->next;
+		return root;
+	}
+	return NULL;
+}
 
 
 
@@ -34,12 +104,15 @@ bst_t* parseFlowFile(char *filename) {
 
 	assert(filename!=NULL);
 	
-	FILE* fp = fopen(filename, FILE_READONLY);
+	FILE* fp = fopen(filename, FILE_READ);
 	assert(fp != NULL);
 	
 	bst_t* bst = parseFlowFileFirstLine(fp);
 	
-	while (parseFlowFileDataLine(bst, fp) != PARSE_FINISHED) {
+	//int i = 0;
+	while (parseFlowFileDataLine(bst, fp) != PARSE_DONE) {
+		//i++;
+		//if (i%5000 == 0) { printf("Parsed %d lines\n", i); }
 	}
 
 	fclose(fp);
@@ -63,8 +136,8 @@ bst_t* parseFlowFileFirstLine(FILE* fp) {
 	while (1) {
 
 		tmpc = fgetc(fp);
-		if (tmpc == COMMA) { continue; }
-		if (tmpc == NEWLINE) { break; }
+		if (tmpc == CSV_COMMA) { continue; }
+		if (tmpc == CSV_NEWLINE) { break; }
 
 		key = (char*)realloc( key, (i+2) * sizeof(char) );
 		assert(key != NULL);
@@ -84,23 +157,23 @@ int parseFlowFileDataLine(bst_t* bst, FILE* fp) {
 	assert(fp!=NULL);
 	
 	// Store the data in an array
-	double* data = (double*)calloc(bst->dim, sizeof(double));
+	float* data = (float*)malloc(bst->dim*sizeof(float));
 	assert(data != NULL);
 	
 	// Read the line
 	int i = 0, read=0;
 	for (i=0; i < bst->dim; i++) {
-		read += fscanf(fp, "%lf,", &(data[i]) );
+		read += fscanf(fp, "%f,", &(data[i]) );
 	}
 
 	// Decide whether to insert data, finish parsing, or detect a file error
 	char endCheck = fgetc(fp);
-	if ( read==(bst->dim) && endCheck == NEWLINE) {
+	if ( read==(bst->dim) && endCheck == CSV_NEWLINE) {
 		bst_insertData(bst, data);
-		return !PARSE_FINISHED;
+		return !PARSE_DONE;
 	} else if ( endCheck == EOF) {
 		free(data);
-		return PARSE_FINISHED;
+		return PARSE_DONE;
 	} else {
 		printf("ERROR: File parsing failed, exiting...");
 		exit(EXIT_FAILURE);
@@ -134,9 +207,8 @@ int bst_freeTree(bst_t* bst) {
 
 	assert(bst!=NULL);
 
-	int freed = bst_freeTree_Rec(bst->root[BST_ORDER_INDEX], BST_ORDER_INDEX);
-	assert(freed == bst->numNodes);
-	
+	int freed = bst_freeTree_Rec(bst, bst->root[BST_INDEX], BST_INDEX);
+	assert(bst->numNodes == 0);
 	free(bst->root);
 	free(bst->key);
 	free(bst);
@@ -145,7 +217,7 @@ int bst_freeTree(bst_t* bst) {
 }
 
 // Inserts a data array into the bst as a node
-void bst_insertData(bst_t* bst, double* data) {
+void bst_insertData(bst_t* bst, float* data) {
 	
 	assert(bst!=NULL);
 	assert(data!=NULL);
@@ -154,30 +226,31 @@ void bst_insertData(bst_t* bst, double* data) {
 	
 	int i=0;
 	for (i=0; i<bst->dim; i++) {
-		if (bst->root[i] == NULL) {
-			bst->root[i] = newNode;
-		} else {
-			bst_insertNode_Rec(bst->root[i], newNode, i);
-		}
+		// if (bst->root[i] == NULL) {
+		// 	bst->root[i] = newNode;
+		// } else {
+		// 	bst_insertNode_Rec(bst->root[i], newNode, i);
+		// }
+		bst_insertNode_Itr(bst,newNode,i);
 	}
 
 	bst->numNodes++;
 }
 
 // Returns data items with a value between lo and hi, from a bst
-results_t bst_searchRange(bst_t* bst, double lo, double hi, int dataIndex) {
+results_t bst_searchRange(bst_t* bst, float lo, float hi, int dataIndex) {
 
 	assert(bst!=NULL);
 	assert(lo<hi);
 	assert(dataIndex<bst->dim);
 
 	results_t found;
-	found.len = FOUND_LEN;
+	found.len = RESULTS_LEN;
 	found.n = 0;
 	found.i = dataIndex;
 	found.lo = lo;
 	found.hi = hi;
-	found.arr = (double**)calloc(found.len, sizeof(double*));
+	found.arr = (float**)calloc(found.len, sizeof(float*));
 	assert(found.arr!=NULL);
 	bst_searchRange_Rec(bst->root[found.i], &found);
 
@@ -193,7 +266,7 @@ void bst_printTree(bst_t* bst, int dataIndex) {
 }
 
 // Prints a data entry
-void bst_printData(bst_t* bst, double* data) {
+void bst_printData(bst_t* bst, float* data) {
 
 	assert(bst!=NULL);
 	assert(data!=NULL);
@@ -212,19 +285,21 @@ void bst_printData(bst_t* bst, double* data) {
 /* * * * * * * * * * * * * * * * * * * * * * * * * * * * *  PRIVATE FUNCTIONS */
 
 // Generates a new node
-static node_t* bst_newNode(int dim, double* data) {
+static node_t* bst_newNode(int dim, float* data) {
 	
-	node_t* newNode = (node_t*)malloc(sizeof(node_t));
-	assert(newNode != NULL);
-
-	newNode->left = (node_t**)calloc(dim, sizeof(node_t*));
-	assert(newNode->left != NULL);
-
-	newNode->right = (node_t**)calloc(dim, sizeof(node_t*));
-	assert(newNode->right != NULL);
-
 	assert(data != NULL);
+	assert(dim>0);
+
+	node_t* newNode = (node_t*)malloc(sizeof(node_t));
 	newNode->d = data;
+	newNode->depthDiff = (int*)calloc(dim, sizeof(int*));
+	newNode->left = (node_t**)calloc(dim, sizeof(node_t*));
+	newNode->right = (node_t**)calloc(dim, sizeof(node_t*));
+
+	assert(newNode != NULL);
+	assert(newNode->depthDiff != NULL);
+	assert(newNode->left != NULL);
+	assert(newNode->right != NULL);
 
 	return newNode;
 }
@@ -243,24 +318,74 @@ static void bst_freeNode(node_t* node) {
 	free(node);
 }
 
-// Recursively insert a node
+/* //Recursively insert a node (Too slow - not used)
 static void bst_insertNode_Rec(node_t* root, node_t* newNode, int dataIndex) {
 
 	assert(root != NULL);
 	assert(newNode != NULL);
 
 	if ( newNode->d[dataIndex] < root->d[dataIndex]) {
+		root->depthDiff[dataIndex]--;
 		if (root->left[dataIndex] != NULL) {
 			bst_insertNode_Rec(root->left[dataIndex], newNode, dataIndex);
-		} else {
+			bst_balance(root, root->left[dataIndex], dataIndex, LEFT);
+			
+		} else { 
 			root->left[dataIndex] = newNode;
 		}
+
 	} else {
+		root->depthDiff[dataIndex]++;
 		if (root->right[dataIndex] != NULL) {
 			bst_insertNode_Rec(root->right[dataIndex], newNode, dataIndex);
-		} else {
+			bst_balance(root, root->right[dataIndex], dataIndex, RIGHT);
+			
+		} else { 
 			root->right[dataIndex] = newNode;
 		}
+	}
+}*/
+
+// Iteratively insert a node
+static void bst_insertNode_Itr(bst_t* bst, node_t* newNode, int dataIndex) {
+
+	assert(bst != NULL);
+	assert(newNode != NULL);
+
+	node_t* parent = NULL;
+	node_t* insertHere = bst->root[dataIndex];
+
+	if (insertHere == NULL) {
+		bst->root[dataIndex] = newNode;
+		return;
+	}
+
+	int insertDir = 0;
+	while (insertHere != NULL) {
+
+		if (parent!=NULL){
+			bst_balance(parent,insertHere, dataIndex, insertDir); 
+		}
+
+		if ( newNode->d[dataIndex] < insertHere->d[dataIndex]) {
+
+			insertDir = LEFT;
+			insertHere->depthDiff[dataIndex]--;
+			parent = insertHere;
+			insertHere = insertHere->left[dataIndex];
+		} else {
+
+			insertDir = RIGHT;
+			insertHere->depthDiff[dataIndex]++;
+			parent = insertHere;
+			insertHere = insertHere->right[dataIndex];
+		}
+	}
+
+	if (insertDir == LEFT) {
+		parent->left[dataIndex] = newNode;
+	} else if (insertDir == RIGHT) {
+		parent->right[dataIndex] = newNode;
 	}
 }
 
@@ -281,14 +406,15 @@ static int bst_printTree_Rec(bst_t* bst, node_t* root, int dataIndex) {
 }
 
 // Recursively free a tree (post order traverse), returns number of items freed
-static int bst_freeTree_Rec(node_t* root, int dataIndex) {
+static int bst_freeTree_Rec(bst_t* bst, node_t* root, int dataIndex) {
 
 	int numFreed = 0;
 	if (root!=NULL) {
 		numFreed++;
-		numFreed += bst_freeTree_Rec(root->left[dataIndex], dataIndex);
-		numFreed += bst_freeTree_Rec(root->right[dataIndex], dataIndex);
+		numFreed += bst_freeTree_Rec(bst, root->left[dataIndex], dataIndex);
+		numFreed += bst_freeTree_Rec(bst, root->right[dataIndex], dataIndex);
 		bst_freeNode(root);
+		bst->numNodes--;
 	}
 	return numFreed;
 }
@@ -312,8 +438,8 @@ static int bst_searchRange_Rec(node_t* node, results_t *f) {
 			
 			// insert the item into the results structure f
 			if (f->n >= f->len) {
-				f->len += FOUND_LEN;
-				f->arr = (double**)realloc(f->arr, f->len * sizeof(double*));
+				f->len += RESULTS_LEN;
+				f->arr = (float**)realloc(f->arr, f->len * sizeof(float*));
 				assert(f->arr != NULL);
 			}
 			f->arr[f->n] = node->d;
@@ -324,4 +450,108 @@ static int bst_searchRange_Rec(node_t* node, results_t *f) {
 	}
 
 	return searched;
+}
+
+/* * * * * * * * * * * * * * * * * * * * * * *  PRIVATE FUNCTIONS (BALANCING) */
+
+// Correct imbalances in the tree
+static void bst_balance(
+	node_t* parent, node_t* node_a, int dataIndex, int parentDirection) {	
+
+	node_t* node_b = NULL;
+
+	if (node_a->depthDiff[dataIndex] > BST_BALANCE_THRESH) {
+		
+		node_b = node_a->right[dataIndex];
+
+		if (node_b->depthDiff[dataIndex] > 0) {
+			bst_rightOuterRot(parent, node_a, dataIndex, parentDirection);
+		} else {
+			bst_rightInnerRot(parent, node_a, dataIndex, parentDirection);
+		}
+
+	} else if (node_a->depthDiff[dataIndex] < -BST_BALANCE_THRESH){
+		
+		node_b = node_a->left[dataIndex];
+
+		if (node_b->depthDiff[dataIndex] < 0) {
+			bst_leftOuterRot(parent, node_a, dataIndex, parentDirection);
+		} else {
+			bst_leftInnerRot(parent, node_a, dataIndex, parentDirection);
+		}
+	}
+}
+
+// Left outer rotation balancing
+static void bst_leftOuterRot(
+	node_t* parent, node_t* node_a, int dataIndex, int parentDirection) {
+
+	assert(node_a!=NULL);
+	assert(node_a->left[dataIndex]!=NULL);
+	assert(parent!=NULL);
+	node_t* node_b = node_a->left[dataIndex];
+
+	node_a->depthDiff[dataIndex] = 0;
+	node_b->depthDiff[dataIndex] = 0;
+	
+	// a.left points to b.right
+	node_a->left[dataIndex] = node_b->right[dataIndex];
+	
+	// b.right points to a
+	node_b->right[dataIndex] = node_a;
+	
+	// parent now points to b (previously a.left)
+	if (parentDirection == LEFT) {
+		parent->left[dataIndex] = node_b;
+	} else {
+		parent->right[dataIndex] = node_b;
+	}
+}
+
+// Right outer rotation balancing
+static void bst_rightOuterRot(
+	node_t* parent, node_t* node_a, int dataIndex, int parentDirection) {
+	
+	assert(parent!=NULL);
+	assert(node_a!=NULL);
+	assert(node_a->right[dataIndex]!=NULL);
+	node_t* node_b = node_a->right[dataIndex];
+
+	node_a->depthDiff[dataIndex] = 0;
+	node_b->depthDiff[dataIndex] = 0;
+
+	// a.right points to b.left
+	node_a->right[dataIndex] = node_b->left[dataIndex];
+	
+	// b.left points to a
+	node_b->left[dataIndex] = node_a;
+	
+	// parent now points to b (previously a.right)
+	if (parentDirection == LEFT) {
+		parent->left[dataIndex] = node_b;
+	} else {
+		parent->right[dataIndex] = node_b;
+	}
+}
+
+// Left inner rotation balancing
+static void bst_leftInnerRot(
+	node_t* parent, node_t* node_a, int dataIndex, int parentDirection){
+
+	assert(node_a!=NULL);
+	assert(node_a->left[dataIndex]!=NULL);
+
+	bst_rightOuterRot(node_a, node_a->left[dataIndex], dataIndex, LEFT);
+	bst_leftOuterRot(parent, node_a, dataIndex, parentDirection);
+}
+
+// Right inner rotation balancing
+static void bst_rightInnerRot(
+	node_t* parent, node_t* node_a, int dataIndex, int parentDirection) {
+
+	assert(node_a!=NULL);
+	assert(node_a->right[dataIndex]!=NULL);
+
+	bst_leftOuterRot(node_a, node_a->right[dataIndex], dataIndex, RIGHT);
+	bst_rightOuterRot(parent, node_a, dataIndex, parentDirection);
 }

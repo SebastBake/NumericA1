@@ -10,19 +10,23 @@
 #ifndef DATA_HANDLER_H
 #define DATA_HANDLER_H
 
-#define FILE_READONLY "r"
-#define PARSE_FINISHED 1
-#define MAX_KEY_SIZE 99
-#define NEWLINE '\n'
-#define COMMA ','
-#define BST_ORDER_INDEX 0
-#define FOUND_LEN 10
+#define FILE_READ "r"
+#define PARSE_DONE 1
+#define CSV_NEWLINE '\n'
+#define CSV_COMMA ','
+#define BST_INDEX 0
+#define BST_BALANCE_THRESH 2
+#define RESULTS_LEN 10
+#define LEFT -1
+#define RIGHT 1
+
 
 /* node type */
 typedef struct node node_t;
 
 struct node {
-    double* d;
+    float* d;
+    int* depthDiff;
     node_t** left;
     node_t** right;
 };
@@ -36,10 +40,10 @@ typedef struct {
 } bst_t;
 
 /* Results */
-typedef struct Results_Struct {
+typedef struct {
 	int len, n, i;
-	double lo, hi;
-	double** arr;
+	float lo, hi;
+	float** arr;
 } results_t;
 
 bst_t* parseFlowFile(char* filename); // works
@@ -49,10 +53,10 @@ int parseFlowFileDataLine(bst_t* bst, FILE* fp); // works
 bst_t* bst_newTree(int dim, char* key); // works
 int bst_freeTree(bst_t* bst);
 
-void bst_printData(bst_t* bst, double* data); // works
+void bst_printData(bst_t* bst, float* data); // works
 void bst_printTree(bst_t* bst, int dataIndex); // works
 
-void bst_insertData(bst_t* bst, double* data); // works
-results_t bst_searchRange(bst_t* bst, double lo, double hi, int dataIndex);
+void bst_insertData(bst_t* bst, float* data); // works
+results_t bst_searchRange(bst_t* bst, float lo, float hi, int dataIndex);
 
 #endif
