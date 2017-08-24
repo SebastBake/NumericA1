@@ -56,11 +56,10 @@ void coarsegrid(bst_t* bst, int resolution) {
 	assert(bst!=NULL);
 
 	int n = resolution*resolution;
+	resultsFilter_t** bound = initBound(n, bst->dim);
 	cell_t* cells[n];
 	float xRes = (GRID_X_MAX - GRID_X_MIN) / resolution;
 	float yRes = (GRID_Y_MAX - GRID_Y_MIN) / resolution;
-
-	resultsFilter_t** bound = initBound(n, bst->dim);
 
 	int xCell=0, yCell=0, cellsIndex=0;
 	for (xCell=0; xCell<resolution; xCell++) {
@@ -78,11 +77,7 @@ void coarsegrid(bst_t* bst, int resolution) {
 	}
 	sortCells(cells, n);
 	printTask2(cells, n);
-
-	int i=0;
-	for (i=0;i<n;i++) { destroyCell(cells[i]); }
-	
-	assert(bound!=NULL);
+	destroyCells(cells, n);
 	free(bound);
 }
 
@@ -98,6 +93,7 @@ void velstat(bst_t* bst) {
 	float percent = 0;
 	int totalPoints = bst->numNodes;
 	int numPointsFound = 0;
+	
 	while(percent<T3_PERCENT_END) {
 		
 		resultsFilter_t searchFilter[] = {
@@ -121,16 +117,8 @@ void velstat(bst_t* bst) {
 }
 
 void wakevis(bst_t* bst) {
-	printf("wakevis() Part 1 - IMPLEMENT ME!\n");
+	float* yheight = getYs_t4(bst);
 	int i,j;
-	int n = 12; // Location in x for wake visualization
-	float* yheight;
-	yheight = (float*) calloc(n,sizeof(float));
-	/* Task 4: Part 2, nothing is to be changed here
-	   Remember to output the spacing into the array yheight
-	   for this to work. You also need to initialize i,j and 
-	   yheight so the skeleton as it stands will not compile */
-	 
 	FILE *ft42;
 	ft42 = fopen("task4_2.txt","w");
 	for (j = 11; j>=0; j--){
@@ -149,11 +137,9 @@ void wakevis(bst_t* bst) {
 		fprintf(ft42, "*\n");
 	}
 	fclose(ft42);
-	
+
 	/* Cleanup */
 	free(yheight);
-
-	exit(EXIT_FAILURE);
 }
 
 
@@ -260,13 +246,16 @@ cell_t* generateCell(bst_t* bst, resultsFilter_t* bounds){
 	return cell;
 }
 
-void destroyCell(cell_t* cell) {
+void destroyCells(cell_t* cell[], int n) {
 
 	assert(cell!=NULL);
 
-	res_free(cell->points);
-	free(cell->av);
-	free(cell);
+	int i=0;
+	for (i=0;i<n;i++) { 
+		res_free(cell[i]->points);
+		free(cell[i]->av);
+		free(cell[i]);
+	}
 }
 
 void printTask2(cell_t* cells[], int n) {
@@ -314,6 +303,7 @@ resultsFilter_t** initBound(int n, int dim) {
 	return bound;
 }
 
+// Recursive selection sort applied to an array of cells
 void sortCells(cell_t* cell[], int n) {
 	
 	assert(cell!=NULL);
@@ -333,6 +323,7 @@ void sortCells(cell_t* cell[], int n) {
 		}
 	}
 
+	// Swap cells
 	cell_t* temp;
 	temp = cell[i];
 	cell[i] = cell[max_index];
@@ -343,6 +334,36 @@ void sortCells(cell_t* cell[], int n) {
 
 
 
-/* * * * * * * * * * * * * * * * * * * * * * * * * *  TASK 3 HELPER FUNCTIONS */
 
 /* * * * * * * * * * * * * * * * * * * * * * * * * *  TASK 4 HELPER FUNCTIONS */
+
+float* getYs_t4(bst_t* bst) {
+
+	FILE* fp = fopen(T4_1_CSV, FILE_REWRITE);
+	assert(fp!=NULL);
+	fprintf(fp, T4_HEADER);
+
+	resultsFilter_t** bound = initBound(T4_NUM_YS, bst->dim);
+	float* ys = (float*)calloc(T4_NUM_YS,sizeof(float));
+	assert(ys!=NULL);
+
+	int i=0;
+	float xVal = 0;
+	for (i=0; i<T4_NUM_YS; i++) {
+
+		xVal = i*T4_XS_INTERVAL + T4_INIT_XS;
+		bound[i][BST_X].lo = xVal - T4_XS_TOLERANCE;
+		bound[i][BST_X].hi = xVal + T4_XS_TOLERANCE;;
+		
+		results_t* res = res_search(bst, bound[i], mvdMaxU);
+		assert(res->numEl == 1);
+		ys[i] = SPACING( (res->arr[0])[BST_Y] );
+		fprintf(fp, "%.0f,%.6f\n",xVal, (res->arr[0])[BST_Y]);
+		res_free(res);
+	}
+
+	free(bound);
+	fflush(fp);
+	fclose(fp);
+	return ys;
+}

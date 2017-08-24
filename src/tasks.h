@@ -14,7 +14,8 @@
 #define T1_CSV "task1.csv"
 #define T2_CSV "task2.csv"
 #define T3_CSV "task3.csv"
-#define T4_CSV "task4.csv"
+#define T4_1_CSV "task4_1.csv"
+#define T4_2_CSV "task4_2.csv"
 
 #define FILE_REWRITE "w"
 
@@ -36,6 +37,13 @@
 #define T3_THRESH_INTERVAL 0.1
 #define T3_PERCENT_END 100
 #define PERCENT(numer, denom) 100*numer/denom
+#define T4_HEADER "x,y_h\n"
+#define T4_NUM_YS 12
+#define T4_INIT_XS 10.0
+#define T4_XS_INTERVAL 5.0
+#define T4_XS_TOLERANCE 0.05
+#define SPACING(y) ceil(10 * fabs(y))
+
 
 // Cell data type for task 2
 typedef struct {
@@ -44,7 +52,7 @@ typedef struct {
     float score;
 } cell_t;
 
-// Filter functions used during searching in maxveldiff(..) - Task 1
+// Filter functions used during searching in Task 1
 int mvdMaxU(float* d, results_t* res);
 int mvdMinU(float* d, results_t* res);
 int mvdMaxV(float* d, results_t* res);
@@ -52,11 +60,14 @@ int mvdMinV(float* d, results_t* res);
 
 // Used in Task 2
 cell_t* generateCell(bst_t* bst, resultsFilter_t* bounds);
-void destroyCell(cell_t* cell);
+void destroyCells(cell_t* cell[], int n);
 void sortCells(cell_t* cells[], int n);
 void printTask2(cell_t* cells[], int n);
 int noCheck(float* a, results_t* b);
 resultsFilter_t** initBound(int n, int dim);
+
+// Used in Task 4
+float* getYs_t4(bst_t* bst);
 
 // Task functions
 void maxveldiff(bst_t* bst);

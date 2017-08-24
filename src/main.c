@@ -15,9 +15,11 @@
 #include "data_handler.h"
 
 #define NUM_ARGS 3
-#define INPUT_INSTRUCTIONS "USAGE EXAMPLE: ./flow flow_data.csv 128"
+#define INPUT_INSTRUCTIONS "USAGE EXAMPLE: ./flow flow_data.csv 24"
 
-//void myTest(char* flowFileName);
+typedef struct timeval myTime_t;
+myTime_t timer_start();
+double timer_stop(myTime_t start);
 
 int main(int argc, char *argv[]) {
 
@@ -26,55 +28,48 @@ int main(int argc, char *argv[]) {
 		printf(INPUT_INSTRUCTIONS);
 		exit(EXIT_FAILURE);
 	}
-
 	char* flowFileName = argv[1];
 	int gridResolution = atoi(argv[2]);
-	printf("FILE: %s, RES: %d\n", flowFileName, gridResolution);
 
-	//myTest(flowFileName);
-
-	/* TODO: Add timing for each task and output running time in ms */
-
-	bst_t* bst = parseFlowFile(flowFileName); // Generate bst
+	// Generate bst
+	bst_t* bst = parseFlowFile(flowFileName);
 	
-	maxveldiff(bst); // Task 1: Find the maximum velocity difference
-	coarsegrid(bst, gridResolution); // Task 2: Coarser Grid
-	velstat(bst); // Task 3: Statistics
-	wakevis(bst); // Task 4: Wake height and visualisation
+	// Task 1: Find the maximum velocity difference
+	myTime_t task1_time = timer_start();
+	maxveldiff(bst);
+	printf("TASK1: %.2lf milliseconds\n", timer_stop(task1_time));
 
-	bst_freeTree(bst); // free bst
+	// Task 2: Coarser Grid
+	myTime_t task2_time = timer_start();
+	coarsegrid(bst, gridResolution);
+	printf("TASK2: %.2lf milliseconds\n", timer_stop(task2_time));
+
+	// Task 3: Statistics
+	myTime_t task3_time = timer_start();
+	velstat(bst);
+	printf("TASK3: %.2lf milliseconds\n", timer_stop(task3_time));
+
+	// Task 4: Wake height and visualisation
+	myTime_t task4_time = timer_start();
+	wakevis(bst);
+	printf("TASK4: %.2lf milliseconds\n", timer_stop(task4_time));
+
+	// free bst
+	bst_freeTree(bst);
 
 	return EXIT_SUCCESS;
 }
 
-// int dudcheck(float* d, results_t* f) {
-// 	return 1;
-// }
+myTime_t timer_start() {
+	myTime_t start;
+	gettimeofday(&start, NULL);
+	return start;
+}
 
-// void myTest(char* flowFileName) {
-
-// 	printf("Parsing...\n");
-// 	bst_t* bst = parseFlowFile(flowFileName);
-	
-// 	printf("Searching...\n");
-
-// 	resultsFilter_t searchFilter[] = {
-// 		{-MAXFLOAT, MAXFLOAT},
-// 		{-MAXFLOAT, MAXFLOAT},
-// 		{-MAXFLOAT, MAXFLOAT},
-// 		{-MAXFLOAT, MAXFLOAT}
-// 	};
-	
-// 	results_t* r = res_search(bst,, &dudcheck);
-	
-// 	int i;
-// 	for (i=0; i<r->numEl; i++) {
-// 		bst_printData(bst, r->arr[i], stdout);
-// 	}
-
-// 	res_free(r);
-
-// 	printf("Freeing: bst_freeTree(bst)\n");
-// 	printf("Freed: %d\n", bst_freeTree(bst));
-// 	bst = NULL;
-// }
+double timer_stop(myTime_t start) {
+	myTime_t stop;
+	gettimeofday(&stop, NULL);
+	double elapsed_ms = (stop.tv_sec - start.tv_sec) * 1000.0;
+	elapsed_ms += (stop.tv_usec - start.tv_usec) / 1000.0;
+	return elapsed_ms;
+}
