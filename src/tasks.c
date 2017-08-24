@@ -19,6 +19,10 @@
 /* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * TASK FUNCTIONS */
 
 void maxveldiff(bst_t* bst) {
+	assert(bst!=NULL);
+
+	FILE* fp = fopen(T1_CSV, FILE_REWRITE);
+	assert(fp!=NULL);
 
 	resultsFilter_t searchFilter[] = {
 		{MVD_THRESH, MAXFLOAT},
@@ -32,24 +36,24 @@ void maxveldiff(bst_t* bst) {
 	results_t* minV = res_search(bst, searchFilter, mvdMinV);
 	results_t* maxV = res_search(bst, searchFilter, mvdMaxV);
 
-	FILE* fp = fopen(TASK_1_CSV, FILE_REWRITE);
-
 	bst_printKey(bst, fp);
 	bst_printData(bst, minU->arr[0], fp);
 	bst_printData(bst, maxU->arr[0], fp);
 	bst_printData(bst, minV->arr[0], fp);
 	bst_printData(bst, maxV->arr[0], fp);
 
-	fflush(fp);
-	fclose(fp);
-
 	res_free(minU);
 	res_free(maxU);
 	res_free(minV);
 	res_free(maxV);
+
+	fflush(fp);
+	fclose(fp);
 }
 
 void coarsegrid(bst_t* bst, int resolution) {
+
+	assert(bst!=NULL);
 
 	int n = resolution*resolution;
 	cell_t* cells[n];
@@ -83,8 +87,37 @@ void coarsegrid(bst_t* bst, int resolution) {
 }
 
 void velstat(bst_t* bst) {
-	printf("velstat() - IMPLEMENT ME!\n");
-	exit(EXIT_FAILURE);
+
+	assert(bst!=NULL);
+
+	FILE* fp = fopen(T3_CSV, FILE_REWRITE);
+	assert(fp!=NULL);
+	fprintf(fp, T3_HEADER);
+
+	float thresh = T3_INIT_THRESH;
+	float percent = 0;
+	int totalPoints = bst->numNodes;
+	int numPointsFound = 0;
+	while(percent<T3_PERCENT_END) {
+		
+		resultsFilter_t searchFilter[] = {
+			{-MAXFLOAT, MAXFLOAT},
+			{-MAXFLOAT, MAXFLOAT},
+			{-MAXFLOAT, thresh},
+			{-MAXFLOAT, MAXFLOAT}
+		};
+
+		results_t* res = res_search(bst, searchFilter, noCheck);
+		numPointsFound = res->numEl;
+		res_free(res);
+		percent = PERCENT(numPointsFound, totalPoints);
+		fprintf(fp,"%.6f,%d,%.6f\n", thresh, numPointsFound, percent);
+
+		thresh = thresh + T3_THRESH_INTERVAL;
+	}
+
+	fflush(fp);
+	fclose(fp);
 }
 
 void wakevis(bst_t* bst) {
@@ -239,9 +272,9 @@ void destroyCell(cell_t* cell) {
 void printTask2(cell_t* cells[], int n) {
 	assert(cells != NULL);
 
-	FILE* fp = fopen(TASK_2_CSV,FILE_REWRITE);
+	FILE* fp = fopen(T2_CSV,FILE_REWRITE);
 
-	fprintf(fp, TASK_2_HEADER);
+	fprintf(fp, T2_HEADER);
 
 	int i=0;
 	for (i=0;i<n;i++) {
@@ -307,7 +340,6 @@ void sortCells(cell_t* cell[], int n) {
 
 	sortCells(cell, n-1);
 }
-
 
 
 

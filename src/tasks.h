@@ -11,10 +11,10 @@
 #ifndef TASKS_H
 #define TASKS_H
 
-#define TASK_1_CSV "task1.csv"
-#define TASK_2_CSV "task2.csv"
-#define TASK_3_CSV "task3.csv"
-#define TASK_4_CSV "task4.csv"
+#define T1_CSV "task1.csv"
+#define T2_CSV "task2.csv"
+#define T3_CSV "task3.csv"
+#define T4_CSV "task4.csv"
 
 #define FILE_REWRITE "w"
 
@@ -26,12 +26,16 @@
 
 #define MVD_THRESH 20.0
 #define CELL_SCORE(x,y,u,v) 100*sqrt( u*u + v*v )/sqrt( x*x + y*y )
-#define TASK_2_HEADER "x,y,u,v,S\n"
-#define TASK_2_DATA "%.6f,%.6f,%.6f,%.6f\n"
+#define T2_HEADER "x,y,u,v,S\n"
 #define GRID_X_MIN 10
 #define GRID_X_MAX 70
 #define GRID_Y_MIN -20
 #define GRID_Y_MAX 20
+#define T3_HEADER "threshold,points,percentage\n"
+#define T3_INIT_THRESH 0.5
+#define T3_THRESH_INTERVAL 0.1
+#define T3_PERCENT_END 100
+#define PERCENT(numer, denom) 100*numer/denom
 
 // Cell data type for task 2
 typedef struct {
