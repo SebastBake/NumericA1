@@ -22,9 +22,10 @@ static void bst_insertNode_Itr(bst_t* bst, node_t* newNode, int dataIndex);
 
 // Recursive functions should be private 
 //static void bst_insertNode_Rec(node_t* root, node_t* newNode, int dataIndex);
-static int bst_printTree_Rec(bst_t* bst, node_t* root, int dataIndex);
+static int bst_printTree_Rec(
+	bst_t* bst, node_t* root, int dataIndex, FILE* stream);
 static int bst_freeTree_Rec(bst_t* bst, node_t* root, int dataIndex);
-static int bst_searchRange_Rec(node_t* node, results_t *f);
+static int bst_search_Rec( node_t* node, results_t *f);
 
 // Balancing functions should be private
 static void bst_balance(
@@ -181,47 +182,124 @@ void bst_insertData(bst_t* bst, float* data) {
 	bst->numNodes++;
 }
 
-// Returns data items with a value between lo and hi, from a bst
-results_t bst_searchRange(bst_t* bst, float lo, float hi, int dataIndex) {
-
+// Prints the key of the bst 
+void bst_printKey(bst_t* bst, FILE* stream) {
+	
 	assert(bst!=NULL);
-	assert(lo<hi);
-	assert(dataIndex<bst->dim);
 
-	results_t found;
-	found.len = RESULTS_LEN;
-	found.n = 0;
-	found.i = dataIndex;
-	found.lo = lo;
-	found.hi = hi;
-	found.arr = (float**)calloc(found.len, sizeof(float*));
-	assert(found.arr!=NULL);
-	bst_searchRange_Rec(bst->root[found.i], &found);
-
-	return found;
+	int i = 0;
+	for (i=0; i < bst->dim; i++) {
+		fprintf(stream, "%c", bst->key[i] );
+		if (i < bst->dim-1) { fprintf(stream, ",");}
+	}
+	fprintf(stream, "\n");
 }
 
 // Prints all of the items in order of low to high
-void bst_printTree(bst_t* bst, int dataIndex) {
+void bst_printTree(bst_t* bst, int dataIndex, FILE* stream) {
 
 	assert(bst!=NULL);
 	assert(dataIndex < bst->dim);
-	bst_printTree_Rec(bst, bst->root[dataIndex], dataIndex);
+
+	bst_printKey(bst, stream);	
+	bst_printTree_Rec(bst, bst->root[dataIndex], dataIndex, stream);
 }
 
 // Prints a data entry
-void bst_printData(bst_t* bst, float* data) {
+void bst_printData(bst_t* bst, float* data, FILE* stream) {
 
 	assert(bst!=NULL);
 	assert(data!=NULL);
 
-	printf("Node: ");
 	int i = 0;
 	for (i=0; i < bst->dim; i++) {
-		printf("%c=%f ", bst->key[i], data[i] );
+		fprintf(stream, "%.6f", data[i] );
+		if (i < bst->dim-1) { fprintf(stream, ",");}
 	}
-	printf("\n");
+	fprintf(stream, "\n");
 }
+
+results_t* res_search(
+    bst_t* bst, float lo, float hi, int dataIndex, int (*check)(float*, results_t*)) {
+
+	float** arr = (float**)calloc(RESULTS_LEN, sizeof(float*));
+	assert(arr!=NULL);
+
+	results_t* res = (results_t*)malloc(sizeof(results_t));
+	assert(res!=NULL);
+
+	res->arrLen = RESULTS_LEN;
+	res->numEl = 0;
+	res->i = dataIndex;
+	res->lo = lo;
+	res->hi = hi;
+	res->check = check;
+	res->arr = arr;
+
+	bst_search_Rec(bst->root[dataIndex], res);
+	
+	return res;
+}
+
+void res_free(results_t* res) {
+	free(res->arr);
+	free(res);
+}
+
+void res_insert(results_t* res, float* d) {
+
+	if( (d[res->i] < res->hi) && (d[res->i] > res->lo) && res->check(d,res)) {
+
+		if (res->numEl >= res->arrLen) {
+			res->arrLen += RESULTS_LEN;
+			res->arr = (float**)realloc(res->arr, res->arrLen * sizeof(float*));
+			assert(res->arr != NULL);
+		}
+
+		res->arr[res->numEl] = d;
+		res->numEl++;
+
+	}
+}
+
+void res_remove(results_t* res, int index) {
+	
+	res->arr[index] = NULL;
+	int i = index;
+	for (i=index; i<res->numEl-1; i++) {
+		res->arr[i] = res->arr[i+1];
+	}
+	res->arr[res->numEl-1] = NULL;
+}
+
+/* A lame function that I wasted time on
+float* bst_minmax(
+	bst_t* bst, int dataIndex, int direction, int (*check)(float*)) {
+	
+	assert(bst != NULL);
+	assert(direction == RIGHT || direction == LEFT);
+	assert(dataIndex < bst->dim);
+
+	if (bst->root[dataIndex]== NULL) {
+		return NULL;
+	}
+
+	node_t* next = bst->root[dataIndex];
+	node_t* n = NULL;
+
+	while(next!=NULL) {
+		if (direction == LEFT) {
+			n = next;
+			next = n->left[dataIndex];
+		} else if (direction == RIGHT ) {
+			n = next;
+			next = n->right[dataIndex];
+		}
+	}
+
+	return n->d;
+}
+*/
 
 
 
@@ -334,7 +412,7 @@ static void bst_insertNode_Itr(bst_t* bst, node_t* newNode, int dataIndex) {
 }
 
 // Recursively print tree (in order traverse), returns number of items printed
-static int bst_printTree_Rec(bst_t* bst, node_t* root, int dataIndex) {
+static int bst_printTree_Rec(bst_t* bst, node_t* root, int dataIndex, FILE* stream) {
 
 	assert(bst != NULL);
 	assert(dataIndex < bst->dim);
@@ -342,9 +420,14 @@ static int bst_printTree_Rec(bst_t* bst, node_t* root, int dataIndex) {
 	int numPrinted = 0;
 	if (root!=NULL) {
 		numPrinted++;
-		numPrinted += bst_printTree_Rec(bst, root->left[dataIndex], dataIndex);
-		bst_printData(bst, root->d);
-		numPrinted += bst_printTree_Rec(bst, root->right[dataIndex], dataIndex);
+
+		numPrinted += bst_printTree_Rec(
+			bst, root->left[dataIndex], dataIndex, stream);
+
+		bst_printData(bst, root->d, stream);
+
+		numPrinted += bst_printTree_Rec(
+			bst, root->right[dataIndex], dataIndex, stream);
 	}
 	return numPrinted;
 }
@@ -364,7 +447,7 @@ static int bst_freeTree_Rec(bst_t* bst, node_t* root, int dataIndex) {
 }
 
 // Recursively search a tree (in order traverse), returns number items searched
-static int bst_searchRange_Rec(node_t* node, results_t *f) {
+static int bst_search_Rec(node_t* node, results_t *f) {
 
 	assert(f!=NULL);
 
@@ -374,27 +457,21 @@ static int bst_searchRange_Rec(node_t* node, results_t *f) {
 		searched++;
 		
 		if ( node->d[f->i] < f->lo ) {
-			searched += bst_searchRange_Rec(node->right[f->i], f);
+			searched += bst_search_Rec(node->right[f->i], f);
 		} else if (node->d[f->i] > f->hi ) {
-			searched += bst_searchRange_Rec(node->left[f->i], f);
+			searched += bst_search_Rec(node->left[f->i], f);
 		} else {
-			searched += bst_searchRange_Rec(node->left[f->i], f);
-			
-			// insert the item into the results structure f
-			if (f->n >= f->len) {
-				f->len += RESULTS_LEN;
-				f->arr = (float**)realloc(f->arr, f->len * sizeof(float*));
-				assert(f->arr != NULL);
-			}
-			f->arr[f->n] = node->d;
-			f->n++;
-
-			searched += bst_searchRange_Rec(node->right[f->i], f);
+			searched += bst_search_Rec(node->left[f->i], f);
+			res_insert(f, node->d);
+			searched += bst_search_Rec(node->right[f->i], f);
 		}
 	}
 
 	return searched;
 }
+
+
+
 
 /* * * * * * * * * * * * * * * * * * * * * * *  PRIVATE FUNCTIONS (BALANCING) */
 

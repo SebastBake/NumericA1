@@ -1,6 +1,6 @@
 /***************************************************************************
  *
- *   File        : data_handler.c
+ *   File        : data_handler.h
  *   Student Id  : 757931
  *   Name        : Sebastian Baker
  *
@@ -20,11 +20,9 @@
 #define LEFT -1
 #define RIGHT 1
 
-
 /* node type */
-typedef struct node node_t;
-
-struct node {
+typedef struct NodeStruct node_t;
+struct NodeStruct {
     float* d;
     int* depthDiff;
     node_t** left;
@@ -40,23 +38,36 @@ typedef struct {
 } bst_t;
 
 /* Results */
-typedef struct {
-	int len, n, i;
-	float lo, hi;
+// check function returns 1 when a new data point should be inserted into the
+// results. 
+typedef struct ResultsStruct results_t;
+struct ResultsStruct {
+    int arrLen, numEl;
+    int i;
+    float lo, hi;
+    int (*check)(float*, results_t*);
 	float** arr;
-} results_t;
+};
 
-bst_t* parseFlowFile(char* filename); // works
-bst_t* parseFlowFileFirstLine(FILE* fp); // works
-int parseFlowFileDataLine(bst_t* bst, FILE* fp); // works
+bst_t* parseFlowFile(char* filename);
+bst_t* parseFlowFileFirstLine(FILE* fp);
+int parseFlowFileDataLine(bst_t* bst, FILE* fp);
 
-bst_t* bst_newTree(int dim, char* key); // works
+bst_t* bst_newTree(int dim, char* key);
+void bst_insertData(bst_t* bst, float* data);
 int bst_freeTree(bst_t* bst);
 
-void bst_printData(bst_t* bst, float* data); // works
-void bst_printTree(bst_t* bst, int dataIndex); // works
+void bst_printKey(bst_t* bst, FILE* stream);
+void bst_printData(bst_t* bst, float* data, FILE* stream);
+void bst_printTree(bst_t* bst, int dataIndex, FILE* stream);
 
-void bst_insertData(bst_t* bst, float* data); // works
-results_t bst_searchRange(bst_t* bst, float lo, float hi, int dataIndex);
+//float* bst_minmax(
+//    bst_t* bst, int dataIndex, int direction, int (*check)(float*));
+
+results_t* res_search(
+    bst_t* bst, float lo, float hi, int dataIndex, int (*check)(float*, results_t*));
+void res_insert(results_t* res, float* d);
+void res_free(results_t* res);
+void res_remove(results_t* res, int index);
 
 #endif

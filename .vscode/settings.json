@@ -2,6 +2,7 @@
     "files.associations": {
         "data_handler.h": "c",
         "math.h": "c",
-        "stdlib.h": "c"
+        "stdlib.h": "c",
+        "assert.h": "c"
     }
 }
