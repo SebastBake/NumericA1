@@ -15,19 +15,14 @@
 
 /* * * * * * * * * * * * * * * * * * * * * * *  PRIVATE FUNCTION DECLARATIONS */
 
-// Functions which deal directly with nodes should be private
+// Private functions 
+// 		- deal directly with nodes should be private and/or
+// 		- are used to balance the tree and/or
+//		- are recursive
+
 static node_t* bst_newNode(int dim, float* data);
 static void bst_freeNode(node_t* node);
 static void bst_insertNode_Itr(bst_t* bst, node_t* newNode, int dataIndex);
-
-// Recursive functions should be private 
-//static void bst_insertNode_Rec(node_t* root, node_t* newNode, int dataIndex);
-static int bst_printTree_Rec(
-	bst_t* bst, node_t* root, int dataIndex, FILE* stream);
-static int bst_freeTree_Rec(bst_t* bst, node_t* root, int dataIndex);
-static int bst_search_Rec( node_t* node, results_t *f);
-
-// Balancing functions should be private
 static void bst_balance(
 	node_t* parent, node_t* node_a, int dataIndex, int parentDirection);
 static void bst_leftOuterRot(
@@ -38,6 +33,10 @@ static void bst_leftInnerRot(
 	node_t* parent, node_t* node_a, int dataIndex, int parentDirection);
 static void bst_rightInnerRot(
 	node_t* parent, node_t* node_a, int dataIndex, int parentDirection);
+static int bst_printTree_Rec(
+	bst_t* bst, node_t* root, int dataIndex, FILE* stream);
+static int bst_freeTree_Rec(bst_t* bst, node_t* root, int dataIndex);
+static void bst_search_Rec( node_t* node, results_t *f);
 
 
 
@@ -53,11 +52,7 @@ bst_t* parseFlowFile(char *filename) {
 	assert(fp != NULL);
 	
 	bst_t* bst = parseFlowFileFirstLine(fp);
-	
-	//int i = 0;
 	while (parseFlowFileDataLine(bst, fp) != PARSE_DONE) {
-		//i++;
-		//if (i%5000 == 0) { printf("Parsed %d lines\n", i); }
 	}
 
 	fclose(fp);
@@ -90,9 +85,7 @@ bst_t* parseFlowFileFirstLine(FILE* fp) {
 		i++;
 	}
 
-	bst_t* bst = bst_newTree(i, key);
-
-	return bst;
+	return bst_newTree(i, key);
 }
 
 // Parses a data entry from flow file, inserts it into bst
@@ -101,17 +94,17 @@ int parseFlowFileDataLine(bst_t* bst, FILE* fp) {
 	assert(bst!=NULL);
 	assert(fp!=NULL);
 	
-	// Store the data in an array
+	// Store the data in an array d
 	float* data = (float*)malloc(bst->dim*sizeof(float));
 	assert(data != NULL);
 	
-	// Read the line
+	// Read the line into array d
 	int i = 0, read=0;
 	for (i=0; i < bst->dim; i++) {
 		read += fscanf(fp, "%f,", &(data[i]) );
 	}
 
-	// Decide whether to insert data, finish parsing, or detect a file error
+	// Decide whether to insert data, finish parsing, or detect an error
 	char endCheck = fgetc(fp);
 	if ( read==(bst->dim) && endCheck == CSV_NEWLINE) {
 		bst_insertData(bst, data);
@@ -141,6 +134,7 @@ bst_t* bst_newTree(int dim, char* key) {
 	bst->numNodes = 0;
 	bst->dim = dim;
 	bst->key = key;
+
 	bst->root = (node_t**)calloc( bst->dim, sizeof(node_t*) );
 	assert(bst->root != NULL);
 
@@ -154,6 +148,7 @@ int bst_freeTree(bst_t* bst) {
 
 	int freed = bst_freeTree_Rec(bst, bst->root[BST_INDEX], BST_INDEX);
 	assert(bst->numNodes == 0);
+
 	free(bst->root);
 	free(bst->key);
 	free(bst);
@@ -171,11 +166,6 @@ void bst_insertData(bst_t* bst, float* data) {
 	
 	int i=0;
 	for (i=0; i<bst->dim; i++) {
-		// if (bst->root[i] == NULL) {
-		// 	bst->root[i] = newNode;
-		// } else {
-		// 	bst_insertNode_Rec(bst->root[i], newNode, i);
-		// }
 		bst_insertNode_Itr(bst,newNode,i);
 	}
 
@@ -190,7 +180,7 @@ void bst_printKey(bst_t* bst, FILE* stream) {
 	int i = 0;
 	for (i=0; i < bst->dim; i++) {
 		fprintf(stream, "%c", bst->key[i] );
-		if (i < bst->dim-1) { fprintf(stream, ",");}
+		if (i < bst->dim-1) { fprintf(stream, ","); }
 	}
 	fprintf(stream, "\n");
 }
@@ -219,8 +209,15 @@ void bst_printData(bst_t* bst, float* data, FILE* stream) {
 	fprintf(stream, "\n");
 }
 
+// Searches a bst for data entries beween lo and hi
+// The check function must return 1 or 0 to insert or not insert an item
+// The check function can also modify the results since it has access to them
 results_t* res_search(
-    bst_t* bst, float lo, float hi, int dataIndex, int (*check)(float*, results_t*)) {
+	bst_t* bst, resultsFilter_t* filter, int (*check)(float*, results_t*)
+) {
+
+	assert(check!=NULL);
+	assert(filter!=NULL);
 
 	float** arr = (float**)calloc(RESULTS_LEN, sizeof(float*));
 	assert(arr!=NULL);
@@ -230,26 +227,42 @@ results_t* res_search(
 
 	res->arrLen = RESULTS_LEN;
 	res->numEl = 0;
-	res->i = dataIndex;
-	res->lo = lo;
-	res->hi = hi;
+	res->dim = bst->dim;
+	res->filter = filter;
 	res->check = check;
 	res->arr = arr;
 
-	bst_search_Rec(bst->root[dataIndex], res);
+	bst_search_Rec(bst->root[BST_INDEX], res);
 	
 	return res;
 }
 
+// Frees a results structure
 void res_free(results_t* res) {
 	free(res->arr);
 	free(res);
 }
 
+// Inserts a data entry into a results structure (provided it is within the rules
+// defined by the structure)
 void res_insert(results_t* res, float* d) {
 
-	if( (d[res->i] < res->hi) && (d[res->i] > res->lo) && res->check(d,res)) {
+	// check that item is insertable
+	int insert = 1, lessThanLo = 0, moreThanHi = 0;
+	int i=0;
+	for (i=0;i<res->dim;i++) {
+		lessThanLo = d[i] < (res->filter[i]).lo;
+		moreThanHi = d[i] > (res->filter[i]).hi;
 
+		if (lessThanLo || moreThanHi ) {
+			insert = 0;
+		}
+	}
+	assert(insert == 1);
+
+	if(insert && res->check(d,res)) {
+
+		// Extend array if necessary
 		if (res->numEl >= res->arrLen) {
 			res->arrLen += RESULTS_LEN;
 			res->arr = (float**)realloc(res->arr, res->arrLen * sizeof(float*));
@@ -258,10 +271,10 @@ void res_insert(results_t* res, float* d) {
 
 		res->arr[res->numEl] = d;
 		res->numEl++;
-
 	}
 }
 
+// Removes a data entry from a results structure
 void res_remove(results_t* res, int index) {
 	
 	res->arr[index] = NULL;
@@ -271,35 +284,6 @@ void res_remove(results_t* res, int index) {
 	}
 	res->arr[res->numEl-1] = NULL;
 }
-
-/* A lame function that I wasted time on
-float* bst_minmax(
-	bst_t* bst, int dataIndex, int direction, int (*check)(float*)) {
-	
-	assert(bst != NULL);
-	assert(direction == RIGHT || direction == LEFT);
-	assert(dataIndex < bst->dim);
-
-	if (bst->root[dataIndex]== NULL) {
-		return NULL;
-	}
-
-	node_t* next = bst->root[dataIndex];
-	node_t* n = NULL;
-
-	while(next!=NULL) {
-		if (direction == LEFT) {
-			n = next;
-			next = n->left[dataIndex];
-		} else if (direction == RIGHT ) {
-			n = next;
-			next = n->right[dataIndex];
-		}
-	}
-
-	return n->d;
-}
-*/
 
 
 
@@ -340,55 +324,28 @@ static void bst_freeNode(node_t* node) {
 	free(node);
 }
 
-/* //Recursively insert a node (Too slow - not used)
-static void bst_insertNode_Rec(node_t* root, node_t* newNode, int dataIndex) {
-
-	assert(root != NULL);
-	assert(newNode != NULL);
-
-	if ( newNode->d[dataIndex] < root->d[dataIndex]) {
-		root->depthDiff[dataIndex]--;
-		if (root->left[dataIndex] != NULL) {
-			bst_insertNode_Rec(root->left[dataIndex], newNode, dataIndex);
-			bst_balance(root, root->left[dataIndex], dataIndex, LEFT);
-			
-		} else { 
-			root->left[dataIndex] = newNode;
-		}
-
-	} else {
-		root->depthDiff[dataIndex]++;
-		if (root->right[dataIndex] != NULL) {
-			bst_insertNode_Rec(root->right[dataIndex], newNode, dataIndex);
-			bst_balance(root, root->right[dataIndex], dataIndex, RIGHT);
-			
-		} else { 
-			root->right[dataIndex] = newNode;
-		}
-	}
-}*/
-
-// Iteratively insert a node
+// Iteratively insert a node into a bst
 static void bst_insertNode_Itr(bst_t* bst, node_t* newNode, int dataIndex) {
 
 	assert(bst != NULL);
 	assert(newNode != NULL);
 
+	// Keep track of the parent node for use when balancing
 	node_t* parent = NULL;
+
+	// The place where the newNode may be inserted
 	node_t* insertHere = bst->root[dataIndex];
 
-	if (insertHere == NULL) {
-		bst->root[dataIndex] = newNode;
-		return;
-	}
-
-	int insertDir = 0;
+	// Iteratively determine where to insert the node
+	int insertDir = 0; // Insertion will occur LEFT or RIGHT of the parent node
 	while (insertHere != NULL) {
 
+		// Balance the tree
 		if (parent!=NULL){
-			bst_balance(parent,insertHere, dataIndex, insertDir); 
+			bst_balance(parent, insertHere, dataIndex, insertDir); 
 		}
 
+		// Go left or right
 		if ( newNode->d[dataIndex] < insertHere->d[dataIndex]) {
 
 			insertDir = LEFT;
@@ -404,30 +361,32 @@ static void bst_insertNode_Itr(bst_t* bst, node_t* newNode, int dataIndex) {
 		}
 	}
 
+	// Insert the node
 	if (insertDir == LEFT) {
 		parent->left[dataIndex] = newNode;
 	} else if (insertDir == RIGHT) {
 		parent->right[dataIndex] = newNode;
+	} else {
+		bst->root[dataIndex] = newNode;
 	}
 }
 
 // Recursively print tree (in order traverse), returns number of items printed
-static int bst_printTree_Rec(bst_t* bst, node_t* root, int dataIndex, FILE* stream) {
+static int bst_printTree_Rec(
+	bst_t* bst, node_t* root, int dataIndex, FILE* stream) {
 
 	assert(bst != NULL);
 	assert(dataIndex < bst->dim);
 
 	int numPrinted = 0;
+	node_t* left = root->left[dataIndex];
+	node_t* right = root->right[dataIndex];
+
 	if (root!=NULL) {
 		numPrinted++;
-
-		numPrinted += bst_printTree_Rec(
-			bst, root->left[dataIndex], dataIndex, stream);
-
+		numPrinted += bst_printTree_Rec(bst, left, dataIndex, stream);
 		bst_printData(bst, root->d, stream);
-
-		numPrinted += bst_printTree_Rec(
-			bst, root->right[dataIndex], dataIndex, stream);
+		numPrinted += bst_printTree_Rec(bst, right, dataIndex, stream);
 	}
 	return numPrinted;
 }
@@ -447,27 +406,26 @@ static int bst_freeTree_Rec(bst_t* bst, node_t* root, int dataIndex) {
 }
 
 // Recursively search a tree (in order traverse), returns number items searched
-static int bst_search_Rec(node_t* node, results_t *f) {
+static void bst_search_Rec(node_t* node, results_t *f) {
 
 	assert(f!=NULL);
 
-	int searched = 0;
-
 	if (node!=NULL) {
-		searched++;
 		
-		if ( node->d[f->i] < f->lo ) {
-			searched += bst_search_Rec(node->right[f->i], f);
-		} else if (node->d[f->i] > f->hi ) {
-			searched += bst_search_Rec(node->left[f->i], f);
-		} else {
-			searched += bst_search_Rec(node->left[f->i], f);
-			res_insert(f, node->d);
-			searched += bst_search_Rec(node->right[f->i], f);
-		}
-	}
+		bst_search_Rec(node->left[BST_INDEX], f);
 
-	return searched;
+		// check that item is insertable
+		int insert = 1, lessThanLo = 0, moreThanHi = 0;
+		int i=0;
+		for (i=0;i<f->dim;i++) {
+			lessThanLo = node->d[i] < (f->filter[i]).lo;
+			moreThanHi = node->d[i] > (f->filter[i]).hi;
+			if (lessThanLo || moreThanHi ) { insert = 0; }
+		}
+		if (insert) { res_insert(f, node->d); }
+
+		bst_search_Rec(node->right[BST_INDEX], f);
+	}
 }
 
 
@@ -568,7 +526,8 @@ static void bst_leftInnerRot(
 
 // Right inner rotation balancing
 static void bst_rightInnerRot(
-	node_t* parent, node_t* node_a, int dataIndex, int parentDirection) {
+	node_t* parent, node_t* node_a, int dataIndex, int parentDirection){
+	
 
 	assert(node_a!=NULL);
 	assert(node_a->right[dataIndex]!=NULL);

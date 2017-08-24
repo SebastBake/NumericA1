@@ -29,6 +29,7 @@ int main(int argc, char *argv[]) {
 
 	char* flowFileName = argv[1];
 	int gridResolution = atoi(argv[2]);
+	printf("FILE: %s, RES: %d\n", flowFileName, gridResolution);
 
 	//myTest(flowFileName);
 
@@ -56,11 +57,15 @@ int main(int argc, char *argv[]) {
 // 	bst_t* bst = parseFlowFile(flowFileName);
 	
 // 	printf("Searching...\n");
+
+// 	resultsFilter_t searchFilter[] = {
+// 		{-MAXFLOAT, MAXFLOAT},
+// 		{-MAXFLOAT, MAXFLOAT},
+// 		{-MAXFLOAT, MAXFLOAT},
+// 		{-MAXFLOAT, MAXFLOAT}
+// 	};
 	
-// 	results_t* r = res_search(bst,
-// 		-0.001158 - 0.00005,
-// 		-0.001158 + 0.00005,
-// 		3, &dudcheck);
+// 	results_t* r = res_search(bst,, &dudcheck);
 	
 // 	int i;
 // 	for (i=0; i<r->numEl; i++) {

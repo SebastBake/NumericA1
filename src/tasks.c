@@ -5,6 +5,7 @@
  *   Name        : Sebastian Baker
  *
  ***************************************************************************/
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <math.h>
@@ -15,38 +16,70 @@
 #include "tasks.h"
 #include "data_handler.h"
 
-// Filter functions used during searching in maxveldiff(..)
-int mvdMaxU(float* d, results_t* res);
-int mvdMinU(float* d, results_t* res);
-int mvdMaxV(float* d, results_t* res);
-int mvdMinV(float* d, results_t* res);
-
+/* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * TASK FUNCTIONS */
 
 void maxveldiff(bst_t* bst) {
 
-	FILE* fp = fopen(TASK_1_CSV, FILE_REWRITE);
+	resultsFilter_t searchFilter[] = {
+		{MVD_THRESH, MAXFLOAT},
+		{-MAXFLOAT, MAXFLOAT},
+		{-MAXFLOAT, MAXFLOAT},
+		{-MAXFLOAT, MAXFLOAT}
+	};
 
-	results_t* minU = res_search(bst, MVD_THRESH, MAXFLOAT, BST_X, mvdMinU);
-	results_t* maxU = res_search(bst, MVD_THRESH, MAXFLOAT, BST_X, mvdMaxU);
-	results_t* minV = res_search(bst, MVD_THRESH, MAXFLOAT, BST_X, mvdMinV);
-	results_t* maxV = res_search(bst, MVD_THRESH, MAXFLOAT, BST_X, mvdMaxV);
+	results_t* minU = res_search(bst, searchFilter, mvdMinU);
+	results_t* maxU = res_search(bst, searchFilter, mvdMaxU);
+	results_t* minV = res_search(bst, searchFilter, mvdMinV);
+	results_t* maxV = res_search(bst, searchFilter, mvdMaxV);
+
+	FILE* fp = fopen(TASK_1_CSV, FILE_REWRITE);
 
 	bst_printKey(bst, fp);
 	bst_printData(bst, minU->arr[0], fp);
 	bst_printData(bst, maxU->arr[0], fp);
 	bst_printData(bst, minV->arr[0], fp);
 	bst_printData(bst, maxV->arr[0], fp);
+
+	fflush(fp);
+	fclose(fp);
+
 	res_free(minU);
 	res_free(maxU);
 	res_free(minV);
 	res_free(maxV);
-
-	fclose(fp);
 }
 
 void coarsegrid(bst_t* bst, int resolution) {
-	printf("coarsegrid() - IMPLEMENT ME!\n");
-	exit(EXIT_FAILURE);
+
+	int n = resolution*resolution;
+	cell_t* cells[n];
+	float xRes = (GRID_X_MAX - GRID_X_MIN) / resolution;
+	float yRes = (GRID_Y_MAX - GRID_Y_MIN) / resolution;
+
+	resultsFilter_t** bound = initBound(n, bst->dim);
+
+	int xCell=0, yCell=0, cellsIndex=0;
+	for (xCell=0; xCell<resolution; xCell++) {
+		for ( yCell=0; yCell<resolution; yCell++) {
+
+			cellsIndex = yCell + resolution*xCell;
+
+			bound[cellsIndex][BST_X].lo = GRID_X_MIN + xCell*xRes;
+			bound[cellsIndex][BST_X].hi = GRID_X_MIN + (xCell+1)*xRes;
+			bound[cellsIndex][BST_Y].lo = GRID_Y_MIN + yCell*yRes;
+			bound[cellsIndex][BST_Y].hi = GRID_Y_MIN + (yCell+1)*yRes;
+			
+			cells[cellsIndex] = generateCell(bst, bound[cellsIndex]);
+		}
+	}
+	sortCells(cells, n);
+	printTask2(cells, n);
+
+	int i=0;
+	for (i=0;i<n;i++) { destroyCell(cells[i]); }
+	
+	assert(bound!=NULL);
+	free(bound);
 }
 
 void velstat(bst_t* bst) {
@@ -93,6 +126,7 @@ void wakevis(bst_t* bst) {
 
 
 
+/* * * * * * * * * * * * * * * * * * * * * * * * * *  TASK 1 HELPER FUNCTIONS */
 
 int mvdMaxU(float* d, results_t* res) {
 	
@@ -101,9 +135,11 @@ int mvdMaxU(float* d, results_t* res) {
 	if (res->numEl == 0) {
 		return 1; // insert item
 	} else if (res->numEl == 1) {
-		if (d[BST_U] > res->arr[0][BST_U]) {
-			res->arr[0] = d;
-		}
+		int biggerU = d[BST_U] > res->arr[0][BST_U];
+		int sameU = d[BST_U] ==res->arr[0][BST_U];
+		int smallerY = d[BST_Y] < res->arr[0][BST_Y];
+		if ( biggerU ) { res->arr[0] = d; }
+		if ( sameU && smallerY) { res->arr[0] = d; }
 		return 0; // Don't insert item
 	}
 	exit(EXIT_FAILURE);
@@ -153,3 +189,128 @@ int mvdMinV(float* d, results_t* res) {
 	}
 	exit(EXIT_FAILURE);
 }
+
+
+
+
+/* * * * * * * * * * * * * * * * * * * * * * * * * *  TASK 2 HELPER FUNCTIONS */
+
+cell_t* generateCell(bst_t* bst, resultsFilter_t* bounds){
+
+	assert(bst!=NULL);
+	assert(bounds!=NULL);
+	
+	cell_t* cell = (cell_t*)malloc(sizeof(cell_t));
+	assert(cell != NULL);
+
+	// Get points by searching the tree
+	cell->points = res_search(bst, bounds, noCheck);
+
+	// Calculate average
+	float* sum = (float*)calloc(bst->dim, sizeof(float));
+	assert(sum!=NULL);
+	cell->av = sum;
+
+	int i=0, dataIndex = 0;
+	for ( dataIndex=0; dataIndex<bst->dim; dataIndex++ ) {
+		for ( i=0; i<(cell->points)->numEl; i++ ) {
+			sum[dataIndex] += (cell->points)->arr[i][dataIndex];
+		}
+		cell->av[dataIndex] = sum[dataIndex]/(cell->points)->numEl;
+	}
+
+	// Calculate score
+	cell->score = CELL_SCORE( 
+		cell->av[BST_X], cell->av[BST_Y], cell->av[BST_U], cell->av[BST_V] 
+	);
+
+	return cell;
+}
+
+void destroyCell(cell_t* cell) {
+
+	assert(cell!=NULL);
+
+	res_free(cell->points);
+	free(cell->av);
+	free(cell);
+}
+
+void printTask2(cell_t* cells[], int n) {
+	assert(cells != NULL);
+
+	FILE* fp = fopen(TASK_2_CSV,FILE_REWRITE);
+
+	fprintf(fp, TASK_2_HEADER);
+
+	int i=0;
+	for (i=0;i<n;i++) {
+		fprintf(fp, "%.6f,%.6f,%.6f,%.6f,%.6f\n",
+				cells[i]->av[BST_X],
+				cells[i]->av[BST_Y],
+				cells[i]->av[BST_U],
+				cells[i]->av[BST_V],
+				cells[i]->score
+			);
+	}
+	
+	fflush(fp);
+	fclose(fp);
+}
+
+int noCheck(float* a, results_t* b) {
+	return 1;
+}
+
+resultsFilter_t** initBound(int n, int dim) {
+	resultsFilter_t** bound = 
+		(resultsFilter_t**)malloc(n * sizeof(resultsFilter_t*));
+	assert(bound!=NULL);
+
+	int i=0;
+	for (i=0; i<n; i++){
+		bound[i] = (resultsFilter_t*)malloc(dim*sizeof(resultsFilter_t));
+		assert(bound[i] != NULL);
+		int j=0;
+		for (j=0; j<dim; j++) {
+			bound[i][j].lo = -MAXFLOAT;
+			bound[i][j].hi = MAXFLOAT;
+		}
+	}
+
+	return bound;
+}
+
+void sortCells(cell_t* cell[], int n) {
+	
+	assert(cell!=NULL);
+
+	int i, max_index;
+	float max = -MAXFLOAT;
+
+	if(n==1){
+		return;
+	}
+
+	for(i=0; i<n-1; i++){
+		if(cell[i]->score > max) {
+
+			max = cell[i]->score;
+			max_index = i;
+		}
+	}
+
+	cell_t* temp;
+	temp = cell[i];
+	cell[i] = cell[max_index];
+	cell[max_index] = temp;
+
+	sortCells(cell, n-1);
+}
+
+
+
+
+/* * * * * * * * * * * * * * * * * * * * * * * * * *  TASK 3 HELPER FUNCTIONS */
+
+/* * * * * * * * * * * * * * * * * * * * * * * * * *  TASK 4 HELPER FUNCTIONS */

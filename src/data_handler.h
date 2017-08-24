@@ -37,14 +37,19 @@ typedef struct {
     char* key;
 } bst_t;
 
-/* Results */
+/* Results type */
 // check function returns 1 when a new data point should be inserted into the
-// results. 
+// results.
+
+typedef struct {
+    float lo, hi;
+} resultsFilter_t;
+
 typedef struct ResultsStruct results_t;
 struct ResultsStruct {
     int arrLen, numEl;
-    int i;
-    float lo, hi;
+    int dim;
+    resultsFilter_t* filter;
     int (*check)(float*, results_t*);
 	float** arr;
 };
@@ -61,11 +66,8 @@ void bst_printKey(bst_t* bst, FILE* stream);
 void bst_printData(bst_t* bst, float* data, FILE* stream);
 void bst_printTree(bst_t* bst, int dataIndex, FILE* stream);
 
-//float* bst_minmax(
-//    bst_t* bst, int dataIndex, int direction, int (*check)(float*));
-
 results_t* res_search(
-    bst_t* bst, float lo, float hi, int dataIndex, int (*check)(float*, results_t*));
+    bst_t* bst, resultsFilter_t* filter, int (*check)(float*, results_t*));
 void res_insert(results_t* res, float* d);
 void res_free(results_t* res);
 void res_remove(results_t* res, int index);
