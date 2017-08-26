@@ -18,6 +18,13 @@
 
 /* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * TASK FUNCTIONS */
 
+// Should produce:
+// x,y,u,v
+// 20.011999,-5.430400,1.024000,-0.001540
+// 20.011999,-0.080000,0.707800,0.000097
+// 20.011999,-1.403700,0.827750,0.006426
+// 20.011999,1.200500,0.808700,-0.006204
+
 void maxveldiff(bst_t* bst) {
 	assert(bst!=NULL);
 
@@ -25,22 +32,22 @@ void maxveldiff(bst_t* bst) {
 	assert(fp!=NULL);
 
 	resultsFilter_t searchFilter[] = {
-		{MVD_THRESH, MAXFLOAT},
-		{-MAXFLOAT, MAXFLOAT},
-		{-MAXFLOAT, MAXFLOAT},
-		{-MAXFLOAT, MAXFLOAT}
+		{MVD_THRESH, FLT_MAX},
+		{-FLT_MAX, FLT_MAX},
+		{-FLT_MAX, FLT_MAX},
+		{-FLT_MAX, FLT_MAX}
 	};
 
-	results_t* minU = res_search(bst, searchFilter, mvdMinU);
 	results_t* maxU = res_search(bst, searchFilter, mvdMaxU);
-	results_t* minV = res_search(bst, searchFilter, mvdMinV);
+	results_t* minU = res_search(bst, searchFilter, mvdMinU);
 	results_t* maxV = res_search(bst, searchFilter, mvdMaxV);
+	results_t* minV = res_search(bst, searchFilter, mvdMinV);
 
 	bst_printKey(bst, fp);
-	bst_printData(bst, minU->arr[0], fp);
-	bst_printData(bst, maxU->arr[0], fp);
-	bst_printData(bst, minV->arr[0], fp);
-	bst_printData(bst, maxV->arr[0], fp);
+	bst_printData(bst->dim, maxU->arr[0], fp);
+	bst_printData(bst->dim, minU->arr[0], fp);
+	bst_printData(bst->dim, maxV->arr[0], fp);
+	bst_printData(bst->dim, minV->arr[0], fp);
 
 	res_free(minU);
 	res_free(maxU);
@@ -55,30 +62,37 @@ void coarsegrid(bst_t* bst, int resolution) {
 
 	assert(bst!=NULL);
 
-	int n = resolution*resolution;
-	resultsFilter_t** bound = initBound(n, bst->dim);
-	cell_t* cells[n];
-	float xRes = (GRID_X_MAX - GRID_X_MIN) / resolution;
-	float yRes = (GRID_Y_MAX - GRID_Y_MIN) / resolution;
+	cell_t* cells[resolution*resolution];
+	cell_t* tmpCell = NULL;
+	float delta_x = (GRID_X_MAX - GRID_X_MIN) / resolution;
+	float delta_y = (GRID_Y_MAX - GRID_Y_MIN) / resolution;
 
-	int xCell=0, yCell=0, cellsIndex=0;
-	for (xCell=0; xCell<resolution; xCell++) {
-		for ( yCell=0; yCell<resolution; yCell++) {
+	resultsFilter_t bound[] = {
+		{-FLT_MAX, FLT_MAX},
+		{-FLT_MAX, FLT_MAX},
+		{-FLT_MAX, FLT_MAX},
+		{-FLT_MAX, FLT_MAX}
+	};
 
-			cellsIndex = yCell + resolution*xCell;
+	int x_i=0, y_i=0, cell_i=0;
+	for ( x_i=0 ; x_i<resolution ; x_i++ ) {
+		for ( y_i=0 ; y_i<resolution ; y_i++ ) {
 
-			bound[cellsIndex][BST_X].lo = GRID_X_MIN + xCell*xRes;
-			bound[cellsIndex][BST_X].hi = GRID_X_MIN + (xCell+1)*xRes;
-			bound[cellsIndex][BST_Y].lo = GRID_Y_MIN + yCell*yRes;
-			bound[cellsIndex][BST_Y].hi = GRID_Y_MIN + (yCell+1)*yRes;
-			
-			cells[cellsIndex] = generateCell(bst, bound[cellsIndex]);
+			bound[BST_X].lo = GRID_X_MIN + x_i*delta_x;
+			bound[BST_X].hi = bound[BST_X].lo + delta_x;
+			bound[BST_Y].lo = GRID_Y_MIN + y_i*delta_y;
+			bound[BST_Y].hi = bound[BST_Y].lo+ delta_y;
+
+			tmpCell = generateCell(bst, bound);
+			if (tmpCell != NULL) {
+				cells[cell_i] = tmpCell;
+				cell_i++;
+			}
 		}
 	}
-	sortCells(cells, n);
-	printTask2(cells, n);
-	destroyCells(cells, n);
-	free(bound);
+	sortCells(cells, cell_i);
+	printTask2(cells, cell_i);
+	destroyCells(cells, cell_i);
 }
 
 void velstat(bst_t* bst) {
@@ -95,12 +109,12 @@ void velstat(bst_t* bst) {
 	int numPointsFound = 0;
 	
 	while(percent<T3_PERCENT_END) {
-		
+
 		resultsFilter_t searchFilter[] = {
-			{-MAXFLOAT, MAXFLOAT},
-			{-MAXFLOAT, MAXFLOAT},
-			{-MAXFLOAT, thresh},
-			{-MAXFLOAT, MAXFLOAT}
+			{-FLT_MAX, FLT_MAX},
+			{-FLT_MAX, FLT_MAX},
+			{-FLT_MAX, thresh},
+			{-FLT_MAX, FLT_MAX}
 		};
 
 		results_t* res = res_search(bst, searchFilter, noCheck);
@@ -108,7 +122,6 @@ void velstat(bst_t* bst) {
 		res_free(res);
 		percent = PERCENT(numPointsFound, totalPoints);
 		fprintf(fp,"%.6f,%d,%.6f\n", thresh, numPointsFound, percent);
-
 		thresh = thresh + T3_THRESH_INTERVAL;
 	}
 
@@ -149,17 +162,28 @@ void wakevis(bst_t* bst) {
 
 int mvdMaxU(float* d, results_t* res) {
 	
-	assert(res->numEl <= 1 && res->numEl >= 0);
+	assert(res->numEl == 1 || res->numEl == 0);
 	
 	if (res->numEl == 0) {
 		return 1; // insert item
 	} else if (res->numEl == 1) {
-		int biggerU = d[BST_U] > res->arr[0][BST_U];
-		int sameU = d[BST_U] ==res->arr[0][BST_U];
-		int smallerY = d[BST_Y] < res->arr[0][BST_Y];
-		if ( biggerU ) { res->arr[0] = d; }
-		if ( sameU && smallerY) { res->arr[0] = d; }
-		return 0; // Don't insert item
+
+		if (d[BST_U] > res->arr[0][BST_U]) { // found a new maximum U
+			res->arr[0] = d; // replace previous result
+		} else if (
+			(d[BST_U] == res->arr[0][BST_U]) && // same maximum U
+			(d[BST_X] < res->arr[0][BST_X])		// earlier in the domain X
+		) {
+			res->arr[0] = d; // replace previous result
+		} else if (
+			(d[BST_U] == res->arr[0][BST_U]) && // same maximum U
+			(d[BST_X] == res->arr[0][BST_X]) && // same domain X
+			(d[BST_Y] < res->arr[0][BST_Y])		// lower Y
+		) {
+			res->arr[0] = d; // replace previous result
+		}
+		return 0;
+
 	}
 	exit(EXIT_FAILURE);
 }
@@ -169,42 +193,80 @@ int mvdMinU(float* d, results_t* res) {
 	assert(res->numEl <= 1 && res->numEl >= 0);
 
 	if (res->numEl == 0) {
-		return 1; // insert item
+		return 1;
 	} else if (res->numEl == 1) {
-		if (d[BST_U] < res->arr[0][BST_U]) {
+
+		if ( d[BST_U] < res->arr[0][BST_U] ) { // new min U found
+			res->arr[0] = d;
+		} else if ( 
+			( d[BST_U] == res->arr[0][BST_U] ) && 	// same U
+			( d[BST_X] < res->arr[0][BST_X] ) 		// earlier in domain X
+		) {
+			res->arr[0] = d;
+		} else if (
+			( d[BST_U] == res->arr[0][BST_U] ) && 	// same U
+			( d[BST_X] == res->arr[0][BST_X] ) &&	// same domain X
+			( d[BST_Y] < res->arr[0][BST_Y] )		// lower domain Y
+		) {
 			res->arr[0] = d;
 		}
-		return 0; // Don't insert item
+		return 0;
 	}
 	exit(EXIT_FAILURE);
 }
 
 int mvdMaxV(float* d, results_t* res) {
-    
-    assert(res->numEl <= 1 && res->numEl >= 0);
+	
+	assert(res->numEl <= 1 && res->numEl >= 0);
 
 	if (res->numEl == 0) {
 		return 1; // insert item
 	} else if (res->numEl == 1) {
-		if (d[BST_V] > res->arr[0][BST_V]) {
+		
+		if ( d[BST_V] > res->arr[0][BST_V] ) { // new max X found
+			res->arr[0] = d;
+		} else if ( 
+			( d[BST_V] == res->arr[0][BST_V] ) && 	// same V
+			( d[BST_X] < res->arr[0][BST_X] ) 		// earlier in domain X
+		) {
+			res->arr[0] = d;
+		} else if (
+			( d[BST_V] == res->arr[0][BST_V] ) && 	// same V
+			( d[BST_X] == res->arr[0][BST_X] ) &&	// same domain X
+			( d[BST_Y] < res->arr[0][BST_Y] )		// lower domain Y
+		) {
 			res->arr[0] = d;
 		}
-		return 0; // Don't insert item
+
+		return 0;
 	}
 	exit(EXIT_FAILURE);
 }
 
 int mvdMinV(float* d, results_t* res) {
-    
-    assert(res->numEl <= 1 && res->numEl >= 0);
+	
+	assert(res->numEl <= 1 && res->numEl >= 0);
 
 	if (res->numEl == 0) {
-		return 1; // insert item
+		return 1;
 	} else if (res->numEl == 1) {
-		if (d[BST_V] < res->arr[0][BST_V]) {
+		
+		if ( d[BST_V] < res->arr[0][BST_V] ) { // new min V found
+			res->arr[0] = d;
+		} else if ( 
+			( d[BST_V] == res->arr[0][BST_V] ) && 	// same V
+			( d[BST_X] < res->arr[0][BST_X] ) 		// earlier in domain X
+		) {
+			res->arr[0] = d;
+		} else if (
+			( d[BST_V] == res->arr[0][BST_V] ) && 	// same V
+			( d[BST_X] == res->arr[0][BST_X] ) &&	// same domain X
+			( d[BST_Y] < res->arr[0][BST_Y] )		// lower domain Y
+		) {
 			res->arr[0] = d;
 		}
-		return 0; // Don't insert item
+
+		return 0;
 	}
 	exit(EXIT_FAILURE);
 }
@@ -224,26 +286,32 @@ cell_t* generateCell(bst_t* bst, resultsFilter_t* bounds){
 
 	// Get points by searching the tree
 	cell->points = res_search(bst, bounds, noCheck);
-
-	// Calculate average
+		
+	// Calculate average and score
 	float* sum = (float*)calloc(bst->dim, sizeof(float));
 	assert(sum!=NULL);
 	cell->av = sum;
 
-	int i=0, dataIndex = 0;
-	for ( dataIndex=0; dataIndex<bst->dim; dataIndex++ ) {
-		for ( i=0; i<(cell->points)->numEl; i++ ) {
-			sum[dataIndex] += (cell->points)->arr[i][dataIndex];
+	if ((cell->points)->numEl != 0) {
+
+		int i=0, dataIndex = 0;
+		for ( dataIndex=0; dataIndex<bst->dim; dataIndex++ ) {
+			for ( i=0; i<(cell->points)->numEl; i++ ) {
+				sum[dataIndex] += (cell->points)->arr[i][dataIndex];
+			}
+			cell->av[dataIndex] = sum[dataIndex]/(cell->points)->numEl;
 		}
-		cell->av[dataIndex] = sum[dataIndex]/(cell->points)->numEl;
+
+		// Calculate score
+		cell->score = CELL_SCORE( 
+			cell->av[BST_X], cell->av[BST_Y], cell->av[BST_U], cell->av[BST_V] 
+		);
+
+		return cell;
+	} else {
+		destroyCell(cell);
+		return NULL;
 	}
-
-	// Calculate score
-	cell->score = CELL_SCORE( 
-		cell->av[BST_X], cell->av[BST_Y], cell->av[BST_U], cell->av[BST_V] 
-	);
-
-	return cell;
 }
 
 void destroyCells(cell_t* cell[], int n) {
@@ -252,10 +320,16 @@ void destroyCells(cell_t* cell[], int n) {
 
 	int i=0;
 	for (i=0;i<n;i++) { 
-		res_free(cell[i]->points);
-		free(cell[i]->av);
-		free(cell[i]);
+		if (cell[i]!=NULL) { destroyCell(cell[i]); };
 	}
+}
+
+void destroyCell(cell_t* cell) {
+	
+	assert(cell!=NULL);
+	res_free(cell->points);
+	free(cell->av);
+	free(cell);
 }
 
 void printTask2(cell_t* cells[], int n) {
@@ -268,12 +342,12 @@ void printTask2(cell_t* cells[], int n) {
 	int i=0;
 	for (i=0;i<n;i++) {
 		fprintf(fp, "%.6f,%.6f,%.6f,%.6f,%.6f\n",
-				cells[i]->av[BST_X],
-				cells[i]->av[BST_Y],
-				cells[i]->av[BST_U],
-				cells[i]->av[BST_V],
-				cells[i]->score
-			);
+		cells[i]->av[BST_X],
+		cells[i]->av[BST_Y],
+		cells[i]->av[BST_U],
+		cells[i]->av[BST_V],
+		cells[i]->score
+	);
 	}
 	
 	fflush(fp);
@@ -284,32 +358,13 @@ int noCheck(float* a, results_t* b) {
 	return 1;
 }
 
-resultsFilter_t** initBound(int n, int dim) {
-	resultsFilter_t** bound = 
-		(resultsFilter_t**)malloc(n * sizeof(resultsFilter_t*));
-	assert(bound!=NULL);
-
-	int i=0;
-	for (i=0; i<n; i++){
-		bound[i] = (resultsFilter_t*)malloc(dim*sizeof(resultsFilter_t));
-		assert(bound[i] != NULL);
-		int j=0;
-		for (j=0; j<dim; j++) {
-			bound[i][j].lo = -MAXFLOAT;
-			bound[i][j].hi = MAXFLOAT;
-		}
-	}
-
-	return bound;
-}
-
 // Recursive selection sort applied to an array of cells
 void sortCells(cell_t* cell[], int n) {
 	
 	assert(cell!=NULL);
 
 	int i, max_index;
-	float max = -MAXFLOAT;
+	float max = -FLT_MAX;
 
 	if(n==1){
 		return;
@@ -317,20 +372,56 @@ void sortCells(cell_t* cell[], int n) {
 
 	for(i=0; i<n-1; i++){
 		if(cell[i]->score > max) {
-
 			max = cell[i]->score;
 			max_index = i;
 		}
 	}
 
-	// Swap cells
-	cell_t* temp;
-	temp = cell[i];
-	cell[i] = cell[max_index];
-	cell[max_index] = temp;
-
+	cellSwap(cell, i, max_index);
 	sortCells(cell, n-1);
 }
+
+void cellSwap(cell_t** cells, int a, int b) {
+	cell_t* temp;
+	temp = cells[a];
+	cells[a] = cells[b];
+	cells[b] = temp;
+}
+ 
+// int cellPartition(cell_t* cells[], int left, int n) {
+// 	int pivot = left;
+// 	int i = left+1;
+// 	int j = n-1;
+
+// 	while(1) {
+// 		while(
+// 			( i <= j ) && 
+// 			(cells[i]->score < cells[pivot]->score) ) {
+// 			i++;
+// 		}
+		 
+// 		while(
+// 			( i <= j ) &&
+// 			(cells[j]->score > cells[pivot]->score) ) {
+// 			j--;
+// 		}
+// 		if (i > j) { break; } else { cellSwap(cells,i,j); }
+// 	}
+// 	cellSwap(cells,pivot,j);
+// 	//printf("%d = part(%d,%d)\n",i , left, n);
+// 	return j;
+// }
+
+// void cellQsort(cell_t* cells[], int left, int n) {
+// 	//printf("sort(%d,%d)\n",left,n);
+// 	if( n-left < 2) {
+// 		return;
+// 	} else {
+// 		int mid = cellPartition(cells, left, n);
+// 		cellQsort(cells,left,mid-1);
+// 		cellQsort(cells,mid+1,n);
+// 	}
+// }
 
 
 
@@ -343,26 +434,33 @@ float* getYs_t4(bst_t* bst) {
 	assert(fp!=NULL);
 	fprintf(fp, T4_HEADER);
 
-	resultsFilter_t** bound = initBound(T4_NUM_YS, bst->dim);
+	//resultsFilter_t bound[T4_NUM_YS][bst->dim];
 	float* ys = (float*)calloc(T4_NUM_YS,sizeof(float));
 	assert(ys!=NULL);
+
+	resultsFilter_t bound[] = {
+		{-FLT_MAX, FLT_MAX},
+		{-FLT_MAX, FLT_MAX},
+		{-FLT_MAX, FLT_MAX},
+		{-FLT_MAX, FLT_MAX}
+	};
 
 	int i=0;
 	float xVal = 0;
 	for (i=0; i<T4_NUM_YS; i++) {
 
 		xVal = i*T4_XS_INTERVAL + T4_INIT_XS;
-		bound[i][BST_X].lo = xVal - T4_XS_TOLERANCE;
-		bound[i][BST_X].hi = xVal + T4_XS_TOLERANCE;;
+		bound[BST_X].lo = xVal - T4_XS_TOLERANCE;
+		bound[BST_X].hi = xVal + T4_XS_TOLERANCE;
 		
-		results_t* res = res_search(bst, bound[i], mvdMaxU);
-		assert(res->numEl == 1);
-		ys[i] = SPACING( (res->arr[0])[BST_Y] );
-		fprintf(fp, "%.0f,%.6f\n",xVal, (res->arr[0])[BST_Y]);
-		res_free(res);
+		results_t* res = res_search(bst, bound, mvdMaxU);
+		if (res->numEl == 1) {
+			ys[i] = SPACING( (res->arr[0])[BST_Y] );
+			fprintf(fp, "%.0f,%.6f\n",xVal, (res->arr[0])[BST_Y]);
+			res_free(res);
+		}
 	}
 
-	free(bound);
 	fflush(fp);
 	fclose(fp);
 	return ys;

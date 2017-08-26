@@ -33,6 +33,7 @@ int main(int argc, char *argv[]) {
 
 	// Generate bst
 	bst_t* bst = parseFlowFile(flowFileName);
+	//bst_printTree(bst,0,stdout);
 	
 	// Task 1: Find the maximum velocity difference
 	myTime_t task1_time = timer_start();

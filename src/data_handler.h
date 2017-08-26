@@ -16,15 +16,18 @@
 #define CSV_COMMA ','
 #define BST_INDEX 0
 #define BST_BALANCE_THRESH 2
-#define RESULTS_LEN 10
+#define RESULTS_LEN 128
 #define LEFT -1
 #define RIGHT 1
+#define MAX(a, b) (((a) > (b)) ? (a) : (b))
 
 /* node type */
 typedef struct NodeStruct node_t;
 struct NodeStruct {
     float* d;
-    int* depthDiff;
+    int* depth_L;
+    int* depth_R;
+    node_t** parent;
     node_t** left;
     node_t** right;
 };
@@ -63,8 +66,8 @@ void bst_insertData(bst_t* bst, float* data);
 int bst_freeTree(bst_t* bst);
 
 void bst_printKey(bst_t* bst, FILE* stream);
-void bst_printData(bst_t* bst, float* data, FILE* stream);
-void bst_printTree(bst_t* bst, int dataIndex, FILE* stream);
+void bst_printData(int dim, float* data, FILE* stream);
+int bst_printTree(bst_t* bst, int dataIndex, FILE* stream);
 
 results_t* res_search(
     bst_t* bst, resultsFilter_t* filter, int (*check)(float*, results_t*));

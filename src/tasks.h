@@ -26,7 +26,9 @@
 #define BST_DIM 4
 
 #define MVD_THRESH 20.0
-#define CELL_SCORE(x,y,u,v) 100*sqrt( u*u + v*v )/sqrt( x*x + y*y )
+#define CELL_SCORE_DENOM(x,y) sqrt( x*x + y*y )
+#define CELL_SCORE_NUMER(u,v) sqrt( u*u + v*v )
+#define CELL_SCORE(x,y,u,v) 100 * CELL_SCORE_NUMER(u,v) / CELL_SCORE_DENOM(x,y)
 #define T2_HEADER "x,y,u,v,S\n"
 #define GRID_X_MIN 10
 #define GRID_X_MAX 70
@@ -36,7 +38,7 @@
 #define T3_INIT_THRESH 0.5
 #define T3_THRESH_INTERVAL 0.1
 #define T3_PERCENT_END 100
-#define PERCENT(numer, denom) 100*numer/denom
+#define PERCENT(numer, denom) 100.0*numer/denom
 #define T4_HEADER "x,y_h\n"
 #define T4_NUM_YS 12
 #define T4_INIT_XS 10.0
@@ -61,10 +63,13 @@ int mvdMinV(float* d, results_t* res);
 // Used in Task 2
 cell_t* generateCell(bst_t* bst, resultsFilter_t* bounds);
 void destroyCells(cell_t* cell[], int n);
+void destroyCell(cell_t* cell);
 void sortCells(cell_t* cells[], int n);
 void printTask2(cell_t* cells[], int n);
 int noCheck(float* a, results_t* b);
-resultsFilter_t** initBound(int n, int dim);
+void cellSwap(cell_t** cells, int a, int b);
+void cellQsort(cell_t* cells[], int left, int right);
+int cellPartition(cell_t* cells[], int left, int right);
 
 // Used in Task 4
 float* getYs_t4(bst_t* bst);
