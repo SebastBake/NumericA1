@@ -13,7 +13,7 @@
 #include <string.h>
 #include <assert.h>
 #include "data_handler.h"
-#include "linkedlist.h"
+//#include "linkedlist.h"
 
 /* * * * * * * * * * * * * * * * * * * * * * *  PRIVATE FUNCTION DECLARATIONS */
 
@@ -24,7 +24,7 @@
 
 static node_t* bst_newNode(int dim, float* data);
 static void bst_freeNode(node_t* node);
-static void bst_insertNode_Itr(bst_t* bst, node_t* newNode, int dataIndex);
+//static void bst_insertNode_Itr(bst_t* bst, node_t* newNode, int dataIndex);
 static void bst_balance( bst_t* bst, node_t* node_a, int dataIndex);
 static node_t* bst_leftOuterRot(bst_t* bst, node_t* node_a, int dataIndex);
 static node_t* bst_rightOuterRot(bst_t* bst, node_t* node_a, int dataIndex);
@@ -32,7 +32,7 @@ static node_t* bst_leftInnerRot(bst_t* bst, node_t* node_a, int dataIndex);
 static node_t* bst_rightInnerRot(bst_t* bst, node_t* node_a, int dataIndex);
 static int bst_printTree_Rec( node_t* n, int dataIndex, int dim, FILE* stream);
 static int bst_freeTree_Rec(bst_t* bst, node_t* root, int dataIndex);
-static void bst_search_Itr(bst_t* bst, results_t *f);
+//static void bst_search_Itr(bst_t* bst, results_t *f);
 static void bst_search_Rec(node_t* node, results_t *f, int t);
 static void bst_insertNode_Rec(bst_t* bst, node_t* root, node_t* newNode, int dataIndex);
 static int node_maxDepth(node_t* node, int dataIndex);
@@ -485,49 +485,49 @@ static void bst_search_Rec(node_t* node, results_t *f, int t) {
 }
 
 // Iterativeley search a tree (pre order traverse), returns number items searched
-static void bst_search_Itr(bst_t* bst, results_t *f) {
+// static void bst_search_Itr(bst_t* bst, results_t *f) {
 	
-	assert(f!=NULL);
-	assert(bst != NULL);
-	if ( bst->root[BST_INDEX] == NULL ) { return; }
+// 	assert(f!=NULL);
+// 	assert(bst != NULL);
+// 	if ( bst->root[BST_INDEX] == NULL ) { return; }
 
-	// Determine best filter to apply (the one with the most narrow bounds)
-	float minDiff=FLT_MAX;
-	int i=0, t=0;
-	for (i=0; i<bst->dim; i++) {
-		if ((f->filter[i].hi - f->filter[i].lo) < minDiff ) {
-			minDiff = f->filter[i].hi - f->filter[i].lo;
-			t = i;
-		}
-	}
+// 	// Determine best filter to apply (the one with the most narrow bounds)
+// 	float minDiff=FLT_MAX;
+// 	int i=0, t=0;
+// 	for (i=0; i<bst->dim; i++) {
+// 		if ((f->filter[i].hi - f->filter[i].lo) < minDiff ) {
+// 			minDiff = f->filter[i].hi - f->filter[i].lo;
+// 			t = i;
+// 		}
+// 	}
 
-	// searchQueue
-	list_t* searchQ = list_new(free);
-	list_push(searchQ, bst->root[t]);
-	node_t* node = NULL;
+// 	// searchQueue
+// 	list_t* searchQ = list_new(free);
+// 	list_push(searchQ, bst->root[t]);
+// 	node_t* node = NULL;
 
-	// Iterate over every node
-	int aboveUpper=0, belowLower=0, inBetween=0;
-	while ( searchQ->num_elements > 0 ) {
+// 	// Iterate over every node
+// 	int aboveUpper=0, belowLower=0, inBetween=0;
+// 	while ( searchQ->num_elements > 0 ) {
 
-		node = list_pop(searchQ);
+// 		node = list_pop(searchQ);
 			
-		aboveUpper = node->d[t] > f->filter[t].hi;
-		belowLower = node->d[t] < f->filter[t].lo;
-		inBetween = (aboveUpper == 0) && (belowLower == 0);
-		//inBetween = 1;
+// 		aboveUpper = node->d[t] > f->filter[t].hi;
+// 		belowLower = node->d[t] < f->filter[t].lo;
+// 		inBetween = (aboveUpper == 0) && (belowLower == 0);
+// 		//inBetween = 1;
 
-		if ( (aboveUpper || inBetween) && (node->left[t] != NULL)) {
-			list_push(searchQ, node->left[t]);
-		}
-		if ( (belowLower || inBetween) && (node->right[t] != NULL)) {
-			list_push(searchQ, node->right[t]);
-		}
+// 		if ( (aboveUpper || inBetween) && (node->left[t] != NULL)) {
+// 			list_push(searchQ, node->left[t]);
+// 		}
+// 		if ( (belowLower || inBetween) && (node->right[t] != NULL)) {
+// 			list_push(searchQ, node->right[t]);
+// 		}
 
-		res_insert(f, node->d);
-	}
-	list_free(searchQ);
-}
+// 		res_insert(f, node->d);
+// 	}
+// 	list_free(searchQ);
+// }
 
 
 
