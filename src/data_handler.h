@@ -17,8 +17,6 @@
 #define BST_INDEX 0
 #define BST_BALANCE_THRESH 2
 #define RESULTS_LEN 128
-#define LEFT -1
-#define RIGHT 1
 #define MAX(a, b) (((a) > (b)) ? (a) : (b))
 
 /* node type */
@@ -57,22 +55,25 @@ struct ResultsStruct {
 	float** arr;
 };
 
+// parse flow file
 bst_t* parseFlowFile(char* filename);
 bst_t* parseFlowFileFirstLine(FILE* fp);
 int parseFlowFileDataLine(bst_t* bst, FILE* fp);
 
+// build a tree
 bst_t* bst_newTree(int dim, char* key);
 void bst_insertData(bst_t* bst, float* data);
 int bst_freeTree(bst_t* bst);
 
+// print data
 void bst_printKey(bst_t* bst, FILE* stream);
 void bst_printData(int dim, float* data, FILE* stream);
 int bst_printTree(bst_t* bst, int dataIndex, FILE* stream);
 
+// search the tree
 results_t* res_search(
     bst_t* bst, resultsFilter_t* filter, int (*check)(float*, results_t*));
-void res_insert(results_t* res, float* d);
+
 void res_free(results_t* res);
-void res_remove(results_t* res, int index);
 
 #endif

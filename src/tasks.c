@@ -18,19 +18,13 @@
 
 /* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * TASK FUNCTIONS */
 
-// Should produce:
-// x,y,u,v
-// 20.011999,-5.430400,1.024000,-0.001540
-// 20.011999,-0.080000,0.707800,0.000097
-// 20.011999,-1.403700,0.827750,0.006426
-// 20.011999,1.200500,0.808700,-0.006204
-
 void maxveldiff(bst_t* bst) {
 	assert(bst!=NULL);
 
 	FILE* fp = fopen(T1_CSV, FILE_REWRITE);
 	assert(fp!=NULL);
 
+	// search for max/min
 	resultsFilter_t searchFilter[] = {
 		{MVD_THRESH, FLT_MAX},
 		{-FLT_MAX, FLT_MAX},
@@ -43,12 +37,14 @@ void maxveldiff(bst_t* bst) {
 	results_t* maxV = res_search(bst, searchFilter, mvdMaxV);
 	results_t* minV = res_search(bst, searchFilter, mvdMinV);
 
+	// print max/min
 	bst_printKey(bst, fp);
 	bst_printData(bst->dim, maxU->arr[0], fp);
 	bst_printData(bst->dim, minU->arr[0], fp);
 	bst_printData(bst->dim, maxV->arr[0], fp);
 	bst_printData(bst->dim, minV->arr[0], fp);
 
+	// free results structures
 	res_free(minU);
 	res_free(maxU);
 	res_free(minV);
@@ -64,8 +60,6 @@ void coarsegrid(bst_t* bst, int resolution) {
 
 	cell_t* cells[resolution*resolution];
 	cell_t* tmpCell = NULL;
-	float delta_x = (GRID_X_MAX - GRID_X_MIN) / resolution;
-	float delta_y = (GRID_Y_MAX - GRID_Y_MIN) / resolution;
 
 	resultsFilter_t bound[] = {
 		{-FLT_MAX, FLT_MAX},
@@ -74,15 +68,20 @@ void coarsegrid(bst_t* bst, int resolution) {
 		{-FLT_MAX, FLT_MAX}
 	};
 
+	float delta_x = (GRID_X_MAX - GRID_X_MIN) / resolution;
+	float delta_y = (GRID_Y_MAX - GRID_Y_MIN) / resolution;
+
 	int x_i=0, y_i=0, cell_i=0;
 	for ( x_i=0 ; x_i<resolution ; x_i++ ) {
 		for ( y_i=0 ; y_i<resolution ; y_i++ ) {
 
+			// generate bounds for search
 			bound[BST_X].lo = GRID_X_MIN + x_i*delta_x;
 			bound[BST_X].hi = bound[BST_X].lo + delta_x;
 			bound[BST_Y].lo = GRID_Y_MIN + y_i*delta_y;
 			bound[BST_Y].hi = bound[BST_Y].lo+ delta_y;
 
+			// search and generate cells
 			tmpCell = generateCell(bst, bound);
 			if (tmpCell != NULL) {
 				cells[cell_i] = tmpCell;
@@ -90,7 +89,9 @@ void coarsegrid(bst_t* bst, int resolution) {
 			}
 		}
 	}
-	sortCells(cells, cell_i);
+
+	// sort, print, free memory
+	qsort(cells, cell_i, sizeof(cell_t*), cellCmp);
 	printTask2(cells, cell_i);
 	destroyCells(cells, cell_i);
 }
@@ -130,7 +131,11 @@ void velstat(bst_t* bst) {
 }
 
 void wakevis(bst_t* bst) {
+
+	// get spacing
 	float* yheight = getYs_t4(bst);
+
+	// Print wake profile using given skeleton
 	int i,j;
 	FILE *ft42;
 	ft42 = fopen("task4_2.txt","w");
@@ -159,13 +164,16 @@ void wakevis(bst_t* bst) {
 
 
 /* * * * * * * * * * * * * * * * * * * * * * * * * *  TASK 1 HELPER FUNCTIONS */
+// These functions are called by the bst search function to decide when to
+// insert items into the search array. They are used in task 1 to replace 
+// previous results so that the correct maximum/minimum is found
 
 int mvdMaxU(float* d, results_t* res) {
 	
 	assert(res->numEl == 1 || res->numEl == 0);
 	
 	if (res->numEl == 0) {
-		return 1; // insert item
+		return 1; // insert item if it's the first result
 	} else if (res->numEl == 1) {
 
 		if (d[BST_U] > res->arr[0][BST_U]) { // found a new maximum U
@@ -193,22 +201,22 @@ int mvdMinU(float* d, results_t* res) {
 	assert(res->numEl <= 1 && res->numEl >= 0);
 
 	if (res->numEl == 0) {
-		return 1;
+		return 1; // insert item if it's the first result
 	} else if (res->numEl == 1) {
 
 		if ( d[BST_U] < res->arr[0][BST_U] ) { // new min U found
-			res->arr[0] = d;
+			res->arr[0] = d; // replace item
 		} else if ( 
 			( d[BST_U] == res->arr[0][BST_U] ) && 	// same U
 			( d[BST_X] < res->arr[0][BST_X] ) 		// earlier in domain X
 		) {
-			res->arr[0] = d;
+			res->arr[0] = d; // replace item
 		} else if (
 			( d[BST_U] == res->arr[0][BST_U] ) && 	// same U
 			( d[BST_X] == res->arr[0][BST_X] ) &&	// same domain X
 			( d[BST_Y] < res->arr[0][BST_Y] )		// lower domain Y
 		) {
-			res->arr[0] = d;
+			res->arr[0] = d; // replace item
 		}
 		return 0;
 	}
@@ -220,22 +228,22 @@ int mvdMaxV(float* d, results_t* res) {
 	assert(res->numEl <= 1 && res->numEl >= 0);
 
 	if (res->numEl == 0) {
-		return 1; // insert item
+		return 1; // insert item if it's the first result
 	} else if (res->numEl == 1) {
 		
 		if ( d[BST_V] > res->arr[0][BST_V] ) { // new max X found
-			res->arr[0] = d;
+			res->arr[0] = d; // replace item
 		} else if ( 
 			( d[BST_V] == res->arr[0][BST_V] ) && 	// same V
 			( d[BST_X] < res->arr[0][BST_X] ) 		// earlier in domain X
 		) {
-			res->arr[0] = d;
+			res->arr[0] = d; // replace item
 		} else if (
 			( d[BST_V] == res->arr[0][BST_V] ) && 	// same V
 			( d[BST_X] == res->arr[0][BST_X] ) &&	// same domain X
 			( d[BST_Y] < res->arr[0][BST_Y] )		// lower domain Y
 		) {
-			res->arr[0] = d;
+			res->arr[0] = d; // replace item
 		}
 
 		return 0;
@@ -248,22 +256,22 @@ int mvdMinV(float* d, results_t* res) {
 	assert(res->numEl <= 1 && res->numEl >= 0);
 
 	if (res->numEl == 0) {
-		return 1;
+		return 1; // insert item if it's the first result
 	} else if (res->numEl == 1) {
 		
 		if ( d[BST_V] < res->arr[0][BST_V] ) { // new min V found
-			res->arr[0] = d;
+			res->arr[0] = d; // replace item
 		} else if ( 
 			( d[BST_V] == res->arr[0][BST_V] ) && 	// same V
 			( d[BST_X] < res->arr[0][BST_X] ) 		// earlier in domain X
 		) {
-			res->arr[0] = d;
+			res->arr[0] = d; // replace item
 		} else if (
 			( d[BST_V] == res->arr[0][BST_V] ) && 	// same V
 			( d[BST_X] == res->arr[0][BST_X] ) &&	// same domain X
 			( d[BST_Y] < res->arr[0][BST_Y] )		// lower domain Y
 		) {
-			res->arr[0] = d;
+			res->arr[0] = d; // replace item
 		}
 
 		return 0;
@@ -276,24 +284,25 @@ int mvdMinV(float* d, results_t* res) {
 
 /* * * * * * * * * * * * * * * * * * * * * * * * * *  TASK 2 HELPER FUNCTIONS */
 
+// Generates a new cell struct for task 2
 cell_t* generateCell(bst_t* bst, resultsFilter_t* bounds){
 
 	assert(bst!=NULL);
 	assert(bounds!=NULL);
-	
 	cell_t* cell = (cell_t*)malloc(sizeof(cell_t));
 	assert(cell != NULL);
 
 	// Get points by searching the tree
 	cell->points = res_search(bst, bounds, noCheck);
 		
-	// Calculate average and score
+	// Calculate average and score if there were results found, else return null
 	float* sum = (float*)calloc(bst->dim, sizeof(float));
 	assert(sum!=NULL);
 	cell->av = sum;
 
 	if ((cell->points)->numEl != 0) {
 
+		// Calculate average
 		int i=0, dataIndex = 0;
 		for ( dataIndex=0; dataIndex<bst->dim; dataIndex++ ) {
 			for ( i=0; i<(cell->points)->numEl; i++ ) {
@@ -314,6 +323,7 @@ cell_t* generateCell(bst_t* bst, resultsFilter_t* bounds){
 	}
 }
 
+// frees a list of cells
 void destroyCells(cell_t* cell[], int n) {
 
 	assert(cell!=NULL);
@@ -324,6 +334,7 @@ void destroyCells(cell_t* cell[], int n) {
 	}
 }
 
+// frees memory associated with a cell
 void destroyCell(cell_t* cell) {
 	
 	assert(cell!=NULL);
@@ -332,6 +343,7 @@ void destroyCell(cell_t* cell) {
 	free(cell);
 }
 
+// Prints the output of task 2
 void printTask2(cell_t* cells[], int n) {
 	assert(cells != NULL);
 
@@ -342,86 +354,33 @@ void printTask2(cell_t* cells[], int n) {
 	int i=0;
 	for (i=0;i<n;i++) {
 		fprintf(fp, "%.6f,%.6f,%.6f,%.6f,%.6f\n",
-		cells[i]->av[BST_X],
-		cells[i]->av[BST_Y],
-		cells[i]->av[BST_U],
-		cells[i]->av[BST_V],
-		cells[i]->score
-	);
+			cells[i]->av[BST_X],
+			cells[i]->av[BST_Y],
+			cells[i]->av[BST_U],
+			cells[i]->av[BST_V],
+			cells[i]->score
+			);
 	}
 	
 	fflush(fp);
 	fclose(fp);
 }
 
+// Check function used to determine if an item should be inserted, returns 1
+// since we only care about whether the item is within the bounds, which is
+// checked during search in data_handler.c - res_insert(..)
 int noCheck(float* a, results_t* b) {
 	return 1;
 }
 
-// Recursive selection sort applied to an array of cells
-void sortCells(cell_t* cell[], int n) {
-	
-	assert(cell!=NULL);
+// Comparison function used to qsort cells by their score
+int cellCmp(const void* a, const void* b) {
 
-	int i, max_index;
-	float max = -FLT_MAX;
+	float a_s = (*(cell_t**)a)->score;
+	float b_s = (*(cell_t**)b)->score;
 
-	if(n==1){
-		return;
-	}
-
-	for(i=0; i<n-1; i++){
-		if(cell[i]->score > max) {
-			max = cell[i]->score;
-			max_index = i;
-		}
-	}
-
-	cellSwap(cell, i, max_index);
-	sortCells(cell, n-1);
+	return (a_s < b_s) - (a_s > b_s);
 }
-
-void cellSwap(cell_t** cells, int a, int b) {
-	cell_t* temp;
-	temp = cells[a];
-	cells[a] = cells[b];
-	cells[b] = temp;
-}
- 
-// int cellPartition(cell_t* cells[], int left, int n) {
-// 	int pivot = left;
-// 	int i = left+1;
-// 	int j = n-1;
-
-// 	while(1) {
-// 		while(
-// 			( i <= j ) && 
-// 			(cells[i]->score < cells[pivot]->score) ) {
-// 			i++;
-// 		}
-		 
-// 		while(
-// 			( i <= j ) &&
-// 			(cells[j]->score > cells[pivot]->score) ) {
-// 			j--;
-// 		}
-// 		if (i > j) { break; } else { cellSwap(cells,i,j); }
-// 	}
-// 	cellSwap(cells,pivot,j);
-// 	//printf("%d = part(%d,%d)\n",i , left, n);
-// 	return j;
-// }
-
-// void cellQsort(cell_t* cells[], int left, int n) {
-// 	//printf("sort(%d,%d)\n",left,n);
-// 	if( n-left < 2) {
-// 		return;
-// 	} else {
-// 		int mid = cellPartition(cells, left, n);
-// 		cellQsort(cells,left,mid-1);
-// 		cellQsort(cells,mid+1,n);
-// 	}
-// }
 
 
 
@@ -430,11 +389,12 @@ void cellSwap(cell_t** cells, int a, int b) {
 
 float* getYs_t4(bst_t* bst) {
 
+	assert(bst!=NULL);
+
 	FILE* fp = fopen(T4_1_CSV, FILE_REWRITE);
 	assert(fp!=NULL);
 	fprintf(fp, T4_HEADER);
 
-	//resultsFilter_t bound[T4_NUM_YS][bst->dim];
 	float* ys = (float*)calloc(T4_NUM_YS,sizeof(float));
 	assert(ys!=NULL);
 
@@ -456,7 +416,9 @@ float* getYs_t4(bst_t* bst) {
 		results_t* res = res_search(bst, bound, mvdMaxU);
 		if (res->numEl == 1) {
 			ys[i] = SPACING( (res->arr[0])[BST_Y] );
-			fprintf(fp, "%.0f,%.6f\n",xVal, (res->arr[0])[BST_Y]);
+			fprintf(fp, "%.6f,%.6f\n",
+				(res->arr[0])[BST_X],
+				(res->arr[0])[BST_Y]);
 			res_free(res);
 		}
 	}

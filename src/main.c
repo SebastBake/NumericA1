@@ -12,7 +12,9 @@
 #include <sys/time.h>
 #include <string.h>
 #include "tasks.h"
-#include "data_handler.h"
+
+/* My BST Library, used for building and searching a balanced BST */
+#include "data_handler.h" 
 
 #define NUM_ARGS 3
 #define INPUT_INSTRUCTIONS "USAGE EXAMPLE: ./flow flow_data.csv 24"
@@ -33,7 +35,6 @@ int main(int argc, char *argv[]) {
 
 	// Generate bst
 	bst_t* bst = parseFlowFile(flowFileName);
-	//bst_printTree(bst,0,stdout);
 	
 	// Task 1: Find the maximum velocity difference
 	myTime_t task1_time = timer_start();

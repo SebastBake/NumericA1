@@ -10,7 +10,7 @@
 CC=gcc
 CFLAGS=-Wall # -Werror #-g -v -o0
 OUT=bin/flow
-SRC=src/linkedlist.o src/data_handler.o src/tasks.o src/main.o
+SRC=src/data_handler.o src/tasks.o src/main.o
 
 all: clean compile
 
@@ -21,7 +21,7 @@ clean:
 	rm -f src/*.o;
 
 run: clean compile
-	bin/flow data/flow_data_50k.csv 128;
+	bin/flow data/flow_data.csv 24;
 
 val: clean compile
 	valgrind --leak-check=full --track-origins=yes bin/flow data/flow_data.csv 24;
