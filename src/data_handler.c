@@ -418,8 +418,8 @@ int res_filterBoundInclude(float* d, results_t* res) {
 	int i=0;
 	for (i=0;i<res->dim;i++) {
 
-		lessThanLo = d[i] < res->filter[i].lo;
-		moreThanHi = d[i] > res->filter[i].hi;
+		lessThanLo = d[i] < (float)res->filter[i].lo;
+		moreThanHi = d[i] > (float)res->filter[i].hi;
 		if ( lessThanLo || moreThanHi ) {
 			insert = 0;
 		}
@@ -434,8 +434,8 @@ int res_filterBoundExclude(float* d, results_t* res) {
 	int i=0;
 	for (i=0;i<res->dim;i++) {
 
-		lessThanLo = d[i] <= res->filter[i].lo;
-		moreThanHi = d[i] >= res->filter[i].hi;
+		lessThanLo = d[i] <= (float)res->filter[i].lo;
+		moreThanHi = d[i] >= (float)res->filter[i].hi;
 		if ( lessThanLo || moreThanHi ) {
 			insert = 0;
 		}

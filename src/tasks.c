@@ -374,13 +374,6 @@ void printTask2(cell_t* cells[], int n) {
 	fclose(fp);
 }
 
-// Check function used to determine if an item should be inserted, returns 1
-// because we only care about whether the item is within the bounds, which is
-// checked during search in data_handler.c - res_insert(..)
-int noCheck(float* a, results_t* b) {
-	return 1;
-}
-
 // Comparison function used to qsort cells by their score
 int cellCmp(const void* a, const void* b) {
 
@@ -416,7 +409,7 @@ float* getYs_t4(bst_t* bst) {
 			{-DBL_MAX, DBL_MAX}
 		};
 		
-		results_t* res = res_search(bst, bound, t3_filter);
+		results_t* res = res_search(bst, bound, t4_checker);
 		if (res->numEl == 1) {
 			ys[i] = SPACING( (res->arr[0])[BST_Y] );
 			fprintf(fp, "%.6f,%.6f\n",
@@ -431,7 +424,8 @@ float* getYs_t4(bst_t* bst) {
 	return ys;
 }
 
-int t3_filter(float* d, results_t* res) {
+// Used in search by task 4 to insert items into the results array
+int t4_checker(float* d, results_t* res) {
 	
 	assert(res->numEl == 1 || res->numEl == 0);
 	
@@ -450,9 +444,9 @@ int t3_filter(float* d, results_t* res) {
 			// replace priority: closest x --> maximum u --> minimum y
 			if (closerX) {
 				res->arr[0] = d; // replace previous result
-			} else if ((sameX) && (maxU)) {
+			} else if (sameX && maxU) {
 				res->arr[0] = d; // replace previous result
-			} else if ((sameX) && (sameU) && (minY)) {
+			} else if (sameX && sameU && minY) {
 				res->arr[0] = d; // replace previous result
 			}
 			return 0;
