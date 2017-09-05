@@ -15,44 +15,50 @@
 #define CSV_NEWLINE '\n'
 #define CSV_COMMA ','
 #define BST_INDEX 0
-#define BST_BALANCE_THRESH 2
+#define BST_BALANCE_A 2
+#define BST_BALANCE_B 1
 #define RESULTS_LEN 128
 #define MAX(a, b) (((a) > (b)) ? (a) : (b))
+#define EPS 0.00001
 
 /* node type */
+// Note: Each node is part of any number of binary trees, a tree is formed for
+// each of the data entries in the csv, so that in the case of this assignment, 
+// there would be trees for x,y,u and v
 typedef struct NodeStruct node_t;
 struct NodeStruct {
-    float* d;
-    int* depth_L;
-    int* depth_R;
-    node_t** parent;
-    node_t** left;
-    node_t** right;
+	float* d; // data
+	int* depth_L; // depth of the left subtree
+	int* depth_R; // depth of the right subtree
+	node_t** parent; // Pointers to parents
+	node_t** left; // Pointers to left subtrees
+	node_t** right; // Pointers to right subtrees
 };
 
 /* bst type */
 typedef struct {
-    int numNodes;
-    int dim;
-    node_t** root;
-    char* key;
+	int numNodes;
+	int dim; // dimension of the tree, eg: 4 for {'x','y','u','v'}
+	node_t** root;
+	char* key; // In this case the key is: {'x','y','u','v'}
 } bst_t;
 
 /* Results type */
-// check function returns 1 when a new data point should be inserted into the
-// results.
+// Note: Check function returns 1 when a new data point should be inserted into
+// the results. I also use the check function to do other stuff, like keep track
+// of the maximum value in the results.
 
-typedef struct {
-    float lo, hi;
+typedef struct { // Used to define a search
+	double lo, hi;
 } resultsFilter_t;
 
 typedef struct ResultsStruct results_t;
 struct ResultsStruct {
-    int arrLen, numEl;
-    int dim;
-    resultsFilter_t* filter;
-    int (*check)(float*, results_t*);
-	float** arr;
+	int arrLen, numEl;
+	int dim;
+	resultsFilter_t* filter;
+	int (*check)(float*, results_t*);
+	float** arr; // results of the search appear in this array
 };
 
 // parse flow file
@@ -72,8 +78,9 @@ int bst_printTree(bst_t* bst, int dataIndex, FILE* stream);
 
 // search the tree
 results_t* res_search(
-    bst_t* bst, resultsFilter_t* filter, int (*check)(float*, results_t*));
-
+	bst_t* bst, resultsFilter_t* filter, int (*check)(float*, results_t*));
 void res_free(results_t* res);
+int res_filterBoundExclude(float* d, results_t* res);
+int res_filterBoundInclude(float* d, results_t* res);
 
 #endif

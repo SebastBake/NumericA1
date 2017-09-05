@@ -16,7 +16,6 @@
 #define T3_CSV "task3.csv"
 #define T4_1_CSV "task4_1.csv"
 #define T4_2_CSV "task4_2.csv"
-
 #define FILE_REWRITE "w"
 
 #define BST_X 0
@@ -25,27 +24,31 @@
 #define BST_V 3
 #define BST_DIM 4
 
-#define MVD_THRESH 20.0
-#define CELL_SCORE_DENOM(x,y) sqrt( x*x + y*y )
-#define CELL_SCORE_NUMER(u,v) sqrt( u*u + v*v )
-#define CELL_SCORE(x,y,u,v) 100 * (CELL_SCORE_NUMER(u,v)/CELL_SCORE_DENOM(x,y))
+#define MVD_THRESH 20
+
 #define T2_HEADER "x,y,u,v,S\n"
-#define GRID_X_MIN 10.0
-#define GRID_X_MAX 70.0
-#define GRID_Y_MIN -20.0
-#define GRID_Y_MAX 20.0
+#define T2_SCORE(x,y,u,v) 100*(sqrt(pow(u,2)+pow(v,2))/sqrt(pow(x,2)+pow(y,2)))
+#define T2_DX(resolution) (70 - 10) / resolution
+#define T2_DY(resolution) (20 - (-20)) / resolution
+#define T2_X_LO(i, dx) (10 + i*dx) 
+#define T2_X_HI(i, dx) (10 + i*dx + dx) 
+#define T2_Y_LO(i, dy) (-20 + i*dy) 
+#define T2_Y_HI(i, dy) (-20 + i*dy + dy) 
+
+
 #define T3_HEADER "threshold,points,percentage\n"
 #define T3_INIT_THRESH 0.5
 #define T3_THRESH_INTERVAL 0.1
+#define T3_THRESHOLD(i) (double)(0.5 + (i*0.1))
 #define T3_PERCENT_END 100.0
-#define PERCENT(numer, denom) 100.0*numer/denom
-#define T4_HEADER "x,y_h\n"
-#define T4_NUM_YS 12
-#define T4_INIT_XS 10.0
-#define T4_XS_INTERVAL 5.0
-#define T4_XS_TOLERANCE 0.05
-#define SPACING(y) ceil(10 * fabs(y))
+#define PERCENT(numer, denom) 100.0*((float)numer/(float)denom)
 
+#define T4_HEADER "x,y_h\n"
+#define T4_NUM_Y 12
+#define T4_X_LO(i) (double)(i*5.0 + 10.0 - 0.05)
+#define T4_X_HI(i) (double)(i*5.0 + 10.0 + 0.05)
+#define AVERAGE(x,y) (double)((x+y)/2)
+#define SPACING(y) ceil(10.0 * fabs(y))
 
 // Cell data type for task 2
 typedef struct {
@@ -64,13 +67,11 @@ int mvdMinV(float* d, results_t* res);
 cell_t* generateCell(bst_t* bst, resultsFilter_t* bounds);
 void destroyCells(cell_t* cell[], int n);
 void destroyCell(cell_t* cell);
-// void sortCells(cell_t* cells[], int n);
 void printTask2(cell_t* cells[], int n);
-int noCheck(float* a, results_t* b);
-// void cellSwap(cell_t** cells, int a, int b);
-// void cellQsort(cell_t* cells[], int left, int right);
-// int cellPartition(cell_t* cells[], int left, int right);
 int cellCmp(const void* a, const void* b);
+
+// Filter function for task 3
+int t3_filter(float* d, results_t* res);
 
 // Used in Task 4
 float* getYs_t4(bst_t* bst);

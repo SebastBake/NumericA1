@@ -19,6 +19,7 @@
 /* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * TASK FUNCTIONS */
 
 void maxveldiff(bst_t* bst) {
+
 	assert(bst!=NULL);
 
 	FILE* fp = fopen(T1_CSV, FILE_REWRITE);
@@ -26,10 +27,10 @@ void maxveldiff(bst_t* bst) {
 
 	// search for max/min
 	resultsFilter_t searchFilter[] = {
-		{MVD_THRESH, FLT_MAX},
-		{-FLT_MAX, FLT_MAX},
-		{-FLT_MAX, FLT_MAX},
-		{-FLT_MAX, FLT_MAX}
+		{MVD_THRESH, DBL_MAX},
+		{-DBL_MAX, DBL_MAX},
+		{-DBL_MAX, DBL_MAX},
+		{-DBL_MAX, DBL_MAX}
 	};
 
 	results_t* maxU = res_search(bst, searchFilter, mvdMaxU);
@@ -60,36 +61,27 @@ void coarsegrid(bst_t* bst, int resolution) {
 
 	cell_t* cells[resolution*resolution];
 	cell_t* tmpCell = NULL;
-
-	resultsFilter_t bound[] = {
-		{-FLT_MAX, FLT_MAX},
-		{-FLT_MAX, FLT_MAX},
-		{-FLT_MAX, FLT_MAX},
-		{-FLT_MAX, FLT_MAX}
-	};
-
-	float delta_x = (GRID_X_MAX - GRID_X_MIN) / resolution;
-	float delta_y = (GRID_Y_MAX - GRID_Y_MIN) / resolution;
+	const float dx = T2_DX(resolution); // x size of a cell
+	const float dy = T2_DY(resolution); // y size of a cell
 
 	int x_i=0, y_i=0, cell_i=0;
-	for ( x_i=0 ; x_i<resolution ; x_i++ ) {
-		for ( y_i=0 ; y_i<resolution ; y_i++ ) {
+	for ( x_i=0 ; x_i < resolution ; x_i++ ) {
+		for ( y_i=0 ; y_i < resolution ; y_i++ ) {
 
-			// generate bounds for search
-			bound[BST_X].lo = GRID_X_MIN + x_i*delta_x;
-			bound[BST_X].hi = bound[BST_X].lo + delta_x;
-			bound[BST_Y].lo = GRID_Y_MIN + y_i*delta_y;
-			bound[BST_Y].hi = bound[BST_Y].lo+ delta_y;
+			resultsFilter_t bound[] = {
+				{T2_X_LO(x_i,dx), T2_X_HI(x_i,dx)},
+				{T2_Y_LO(y_i,dy), T2_Y_HI(y_i,dy)},
+				{-DBL_MAX, DBL_MAX},
+				{-DBL_MAX, DBL_MAX}
+			};
 
-			// search and generate cells
+			// search data and generate cells
 			tmpCell = generateCell(bst, bound);
 			if (tmpCell != NULL) {
-				cells[cell_i] = tmpCell;
-				cell_i++;
+				cells[cell_i++] = tmpCell;
 			}
 		}
 	}
-
 	// sort, print, free memory
 	qsort(cells, cell_i, sizeof(cell_t*), cellCmp);
 	printTask2(cells, cell_i);
@@ -103,27 +95,26 @@ void velstat(bst_t* bst) {
 	FILE* fp = fopen(T3_CSV, FILE_REWRITE);
 	assert(fp!=NULL);
 	fprintf(fp, T3_HEADER);
-
-	float thresh = T3_INIT_THRESH;
 	float percent = 0;
 	int totalPoints = bst->numNodes;
 	int numPointsFound = 0;
+	int i = 0;
 	
 	while(percent<T3_PERCENT_END) {
 
 		resultsFilter_t searchFilter[] = {
-			{-FLT_MAX, FLT_MAX},
-			{-FLT_MAX, FLT_MAX},
-			{-FLT_MAX, thresh},
-			{-FLT_MAX, FLT_MAX}
+			{-DBL_MAX, DBL_MAX},
+			{-DBL_MAX, DBL_MAX},
+			{-DBL_MAX, T3_THRESHOLD(i)},
+			{-DBL_MAX, DBL_MAX}
 		};
 
-		results_t* res = res_search(bst, searchFilter, noCheck);
+		results_t* res = res_search(bst, searchFilter, res_filterBoundExclude);
 		numPointsFound = res->numEl;
 		res_free(res);
 		percent = PERCENT(numPointsFound, totalPoints);
-		fprintf(fp,"%.6f,%d,%.6f\n", thresh, numPointsFound, percent);
-		thresh = thresh + T3_THRESH_INTERVAL;
+		fprintf(fp,"%.6f,%d,%.6lf\n", T3_THRESHOLD(i), numPointsFound, percent);
+		i++;
 	}
 
 	fflush(fp);
@@ -172,111 +163,127 @@ int mvdMaxU(float* d, results_t* res) {
 	
 	assert(res->numEl == 1 || res->numEl == 0);
 	
-	if (res->numEl == 0) {
-		return 1; // insert item if it's the first result
-	} else if (res->numEl == 1) {
-
-		if (d[BST_U] > res->arr[0][BST_U]) { // found a new maximum U
-			res->arr[0] = d; // replace previous result
-		} else if (
-			(d[BST_U] == res->arr[0][BST_U]) && // same maximum U
-			(d[BST_X] < res->arr[0][BST_X])		// earlier in the domain X
-		) {
-			res->arr[0] = d; // replace previous result
-		} else if (
-			(d[BST_U] == res->arr[0][BST_U]) && // same maximum U
-			(d[BST_X] == res->arr[0][BST_X]) && // same domain X
-			(d[BST_Y] < res->arr[0][BST_Y])		// lower Y
-		) {
-			res->arr[0] = d; // replace previous result
+	if (res_filterBoundExclude(d, res)) {
+		if (res->numEl == 0) {
+			return 1; // insert item if it's the first result
+		} else if (res->numEl == 1) {
+	
+			if (d[BST_U] > res->arr[0][BST_U]) { // found a new maximum U
+				res->arr[0] = d; // replace previous result
+			} else if (
+				(d[BST_U] == res->arr[0][BST_U]) && // same maximum U
+				(d[BST_X] < res->arr[0][BST_X])		// earlier in the domain X
+			) {
+				res->arr[0] = d; // replace previous result
+			} else if (
+				(d[BST_U] == res->arr[0][BST_U]) && // same maximum U
+				(d[BST_X] == res->arr[0][BST_X]) && // same domain X
+				(d[BST_Y] < res->arr[0][BST_Y])		// lower Y
+			) {
+				res->arr[0] = d; // replace previous result
+			}
+			return 0;
+	
 		}
-		return 0;
-
+		exit(EXIT_FAILURE);
 	}
-	exit(EXIT_FAILURE);
+	return 0;
 }
 
 int mvdMinU(float* d, results_t* res) {
 	
 	assert(res->numEl <= 1 && res->numEl >= 0);
 
-	if (res->numEl == 0) {
-		return 1; // insert item if it's the first result
-	} else if (res->numEl == 1) {
-
-		if ( d[BST_U] < res->arr[0][BST_U] ) { // new min U found
-			res->arr[0] = d; // replace item
-		} else if ( 
-			( d[BST_U] == res->arr[0][BST_U] ) && 	// same U
-			( d[BST_X] < res->arr[0][BST_X] ) 		// earlier in domain X
-		) {
-			res->arr[0] = d; // replace item
-		} else if (
-			( d[BST_U] == res->arr[0][BST_U] ) && 	// same U
-			( d[BST_X] == res->arr[0][BST_X] ) &&	// same domain X
-			( d[BST_Y] < res->arr[0][BST_Y] )		// lower domain Y
-		) {
-			res->arr[0] = d; // replace item
+	if (res_filterBoundExclude(d, res)) {
+		if (res->numEl == 0) {
+			return 1; // insert item if it's the first result
+		} else if (res->numEl == 1) {
+	
+			if ( d[BST_U] < res->arr[0][BST_U] ) { // new min U found
+				res->arr[0] = d; // replace item
+			} else if ( 
+				( d[BST_U] == res->arr[0][BST_U] ) && 	// same U
+				( d[BST_X] < res->arr[0][BST_X] ) 		// earlier in domain X
+			) {
+				res->arr[0] = d; // replace item
+			} else if (
+				( d[BST_U] == res->arr[0][BST_U] ) && 	// same U
+				( d[BST_X] == res->arr[0][BST_X] ) &&	// same domain X
+				( d[BST_Y] < res->arr[0][BST_Y] )		// lower domain Y
+			) {
+				res->arr[0] = d; // replace item
+			}
+			return 0;
 		}
-		return 0;
+		exit(EXIT_FAILURE);
 	}
-	exit(EXIT_FAILURE);
+	return 0;
 }
 
 int mvdMaxV(float* d, results_t* res) {
 	
 	assert(res->numEl <= 1 && res->numEl >= 0);
 
-	if (res->numEl == 0) {
-		return 1; // insert item if it's the first result
-	} else if (res->numEl == 1) {
-		
-		if ( d[BST_V] > res->arr[0][BST_V] ) { // new max X found
-			res->arr[0] = d; // replace item
-		} else if ( 
-			( d[BST_V] == res->arr[0][BST_V] ) && 	// same V
-			( d[BST_X] < res->arr[0][BST_X] ) 		// earlier in domain X
-		) {
-			res->arr[0] = d; // replace item
-		} else if (
-			( d[BST_V] == res->arr[0][BST_V] ) && 	// same V
-			( d[BST_X] == res->arr[0][BST_X] ) &&	// same domain X
-			( d[BST_Y] < res->arr[0][BST_Y] )		// lower domain Y
-		) {
-			res->arr[0] = d; // replace item
-		}
+	if (res_filterBoundExclude(d, res)) {
 
-		return 0;
+		if (res->numEl == 0) {
+			return 1; // insert item if it's the first result
+		} else if (res->numEl == 1) {
+			
+			if ( d[BST_V] > res->arr[0][BST_V] ) { // new max X found
+				res->arr[0] = d; // replace item
+			} else if ( 
+				( d[BST_V] == res->arr[0][BST_V] ) && 	// same V
+				( d[BST_X] < res->arr[0][BST_X] ) 		// earlier in domain X
+			) {
+				res->arr[0] = d; // replace item
+			} else if (
+				( d[BST_V] == res->arr[0][BST_V] ) && 	// same V
+				( d[BST_X] == res->arr[0][BST_X] ) &&	// same domain X
+				( d[BST_Y] < res->arr[0][BST_Y] )		// lower domain Y
+			) {
+				res->arr[0] = d; // replace item
+			}
+	
+			return 0;
+		}
+		exit(EXIT_FAILURE);
+
 	}
-	exit(EXIT_FAILURE);
+	return 0;
 }
 
 int mvdMinV(float* d, results_t* res) {
 	
 	assert(res->numEl <= 1 && res->numEl >= 0);
 
-	if (res->numEl == 0) {
-		return 1; // insert item if it's the first result
-	} else if (res->numEl == 1) {
-		
-		if ( d[BST_V] < res->arr[0][BST_V] ) { // new min V found
-			res->arr[0] = d; // replace item
-		} else if ( 
-			( d[BST_V] == res->arr[0][BST_V] ) && 	// same V
-			( d[BST_X] < res->arr[0][BST_X] ) 		// earlier in domain X
-		) {
-			res->arr[0] = d; // replace item
-		} else if (
-			( d[BST_V] == res->arr[0][BST_V] ) && 	// same V
-			( d[BST_X] == res->arr[0][BST_X] ) &&	// same domain X
-			( d[BST_Y] < res->arr[0][BST_Y] )		// lower domain Y
-		) {
-			res->arr[0] = d; // replace item
-		}
+	if (res_filterBoundExclude(d, res)) {
 
-		return 0;
+		if (res->numEl == 0) {
+			return 1; // insert item if it's the first result
+		} else if (res->numEl == 1) {
+			
+			if ( d[BST_V] < res->arr[0][BST_V] ) { // new min V found
+				res->arr[0] = d; // replace item
+			} else if ( 
+				( d[BST_V] == res->arr[0][BST_V] ) && 	// same V
+				( d[BST_X] < res->arr[0][BST_X] ) 		// earlier in domain X
+			) {
+				res->arr[0] = d; // replace item
+			} else if (
+				( d[BST_V] == res->arr[0][BST_V] ) && 	// same V
+				( d[BST_X] == res->arr[0][BST_X] ) &&	// same domain X
+				( d[BST_Y] < res->arr[0][BST_Y] )		// lower Y
+			) {
+				res->arr[0] = d; // replace item
+			}
+	
+			return 0;
+		}
+		exit(EXIT_FAILURE);
+
 	}
-	exit(EXIT_FAILURE);
+	return 0;
 }
 
 
@@ -293,7 +300,7 @@ cell_t* generateCell(bst_t* bst, resultsFilter_t* bounds){
 	assert(cell != NULL);
 
 	// Get points by searching the tree
-	cell->points = res_search(bst, bounds, noCheck);
+	cell->points = res_search(bst, bounds, res_filterBoundInclude);
 		
 	// Calculate average and score if there were results found, else return null
 	float* sum = (float*)calloc(bst->dim, sizeof(float));
@@ -312,9 +319,8 @@ cell_t* generateCell(bst_t* bst, resultsFilter_t* bounds){
 		}
 
 		// Calculate score
-		cell->score = CELL_SCORE( 
-			cell->av[BST_X], cell->av[BST_Y], cell->av[BST_U], cell->av[BST_V] 
-		);
+		cell->score = T2_SCORE( 
+			cell->av[BST_X], cell->av[BST_Y], cell->av[BST_U], cell->av[BST_V] );
 
 		return cell;
 	} else {
@@ -330,13 +336,15 @@ void destroyCells(cell_t* cell[], int n) {
 
 	int i=0;
 	for (i=0;i<n;i++) { 
-		if (cell[i]!=NULL) { destroyCell(cell[i]); };
+		if (cell[i]!=NULL) {
+			destroyCell(cell[i]);
+		};
 	}
 }
 
 // frees memory associated with a cell
 void destroyCell(cell_t* cell) {
-	
+
 	assert(cell!=NULL);
 	res_free(cell->points);
 	free(cell->av);
@@ -348,7 +356,7 @@ void printTask2(cell_t* cells[], int n) {
 	assert(cells != NULL);
 
 	FILE* fp = fopen(T2_CSV,FILE_REWRITE);
-
+	assert(fp!=NULL);
 	fprintf(fp, T2_HEADER);
 
 	int i=0;
@@ -367,7 +375,7 @@ void printTask2(cell_t* cells[], int n) {
 }
 
 // Check function used to determine if an item should be inserted, returns 1
-// since we only care about whether the item is within the bounds, which is
+// because we only care about whether the item is within the bounds, which is
 // checked during search in data_handler.c - res_insert(..)
 int noCheck(float* a, results_t* b) {
 	return 1;
@@ -395,25 +403,20 @@ float* getYs_t4(bst_t* bst) {
 	assert(fp!=NULL);
 	fprintf(fp, T4_HEADER);
 
-	float* ys = (float*)calloc(T4_NUM_YS,sizeof(float));
+	float* ys = (float*)calloc(T4_NUM_Y,sizeof(float));
 	assert(ys!=NULL);
 
-	resultsFilter_t bound[] = {
-		{-FLT_MAX, FLT_MAX},
-		{-FLT_MAX, FLT_MAX},
-		{-FLT_MAX, FLT_MAX},
-		{-FLT_MAX, FLT_MAX}
-	};
-
 	int i=0;
-	float xVal = 0;
-	for (i=0; i<T4_NUM_YS; i++) {
+	for (i=0; i<T4_NUM_Y; i++) {
 
-		xVal = i*T4_XS_INTERVAL + T4_INIT_XS;
-		bound[BST_X].lo = xVal - T4_XS_TOLERANCE;
-		bound[BST_X].hi = xVal + T4_XS_TOLERANCE;
+		resultsFilter_t bound[] = {
+			{T4_X_LO(i), T4_X_HI(i)},
+			{-DBL_MAX, DBL_MAX},
+			{-DBL_MAX, DBL_MAX},
+			{-DBL_MAX, DBL_MAX}
+		};
 		
-		results_t* res = res_search(bst, bound, mvdMaxU);
+		results_t* res = res_search(bst, bound, t3_filter);
 		if (res->numEl == 1) {
 			ys[i] = SPACING( (res->arr[0])[BST_Y] );
 			fprintf(fp, "%.6f,%.6f\n",
@@ -426,4 +429,36 @@ float* getYs_t4(bst_t* bst) {
 	fflush(fp);
 	fclose(fp);
 	return ys;
+}
+
+int t3_filter(float* d, results_t* res) {
+	
+	assert(res->numEl == 1 || res->numEl == 0);
+	
+	if (res_filterBoundInclude(d, res)) {
+		if (res->numEl == 0) {
+			return 1; // insert item if it's the first result
+		} else if (res->numEl == 1) {
+
+			double midX = AVERAGE(res->filter[BST_X].hi, res->filter[BST_X].lo);
+			int closerX = fabs(midX-d[BST_X]) < fabs(midX-res->arr[0][BST_X]);
+			int sameX = d[BST_X] == res->arr[0][BST_X];
+			int maxU = d[BST_U] > res->arr[0][BST_U];
+			int sameU = d[BST_U] == res->arr[0][BST_U];
+			int minY = d[BST_Y] < res->arr[0][BST_Y];
+
+			// replace priority: closest x --> maximum u --> minimum y
+			if (closerX) {
+				res->arr[0] = d; // replace previous result
+			} else if ((sameX) && (maxU)) {
+				res->arr[0] = d; // replace previous result
+			} else if ((sameX) && (sameU) && (minY)) {
+				res->arr[0] = d; // replace previous result
+			}
+			return 0;
+	
+		}
+		exit(EXIT_FAILURE);
+	}
+	return 0;	
 }

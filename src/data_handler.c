@@ -15,8 +15,7 @@
 #include "data_handler.h"
 
 /* * * * * * * * * * * * * * * * * * * * * * *  PRIVATE FUNCTION DECLARATIONS */
-
-// Private functions don't need to be visible to programs outside this file
+// Private functions don't need to be visible to code outside this file
 
 // Funcions dealing with nodes rather than data
 static node_t* bst_newNode(int dim, float* data);
@@ -39,7 +38,6 @@ static void bst_insertNode_Rec(bst_t* bst, node_t* root, node_t* newNode, int da
 // Helper search functions
 static void bst_search_Rec(node_t* node, results_t *f, int t);
 static void res_insert(results_t* res, float* d);
-
 
 
 
@@ -144,7 +142,7 @@ bst_t* bst_newTree(int dim, char* key) {
 	return bst;
 }
 
-// Frees memory associated with a tree, including the data contained in the tree
+// Frees memory associated with a tree, including the data
 int bst_freeTree(bst_t* bst) {
 
 	assert(bst!=NULL);
@@ -250,7 +248,7 @@ results_t* res_search(
 	return res;
 }
 
-// Frees a results structure
+// Free a results structure
 void res_free(results_t* res) {
 	free(res->arr);
 	free(res);
@@ -375,8 +373,8 @@ static void bst_search_Rec(node_t* node, results_t *f, int t) {
 
 		int aboveUpper=0, belowLower=0, inBetween=0;
 		
-		aboveUpper = node->d[t] > f->filter[t].hi;
-		belowLower = node->d[t] < f->filter[t].lo;
+		aboveUpper = node->d[t] > (f->filter[t].hi + EPS);
+		belowLower = node->d[t] < (f->filter[t].lo - EPS);
 		inBetween = (aboveUpper == 0) && (belowLower == 0);
 
 		if ( aboveUpper ) {
@@ -399,20 +397,7 @@ static void bst_search_Rec(node_t* node, results_t *f, int t) {
 // (provided it is within the bounds)
 static void res_insert(results_t* res, float* d) {
 
-	// check that item is insertable
-	int insert = 1, lessThanLo = 0, moreThanHi = 0;
-	int i=0;
-	for (i=0;i<res->dim;i++) {
-
-		lessThanLo = d[i] < (res->filter[i]).lo;
-		moreThanHi = d[i] > (res->filter[i]).hi;
-
-		if (lessThanLo || moreThanHi ) {
-			insert = 0;
-		}
-	}
-
-	if(insert && res->check(d,res)) {
+	if(res->check(d,res)) {
 
 		// Extend array if necessary
 		if (res->numEl >= res->arrLen) {
@@ -426,6 +411,37 @@ static void res_insert(results_t* res, float* d) {
 	}
 }
 
+// Results filter which will include points on the bounds of the filter
+int res_filterBoundInclude(float* d, results_t* res) {
+	// check that item is insertable
+	int insert = 1, lessThanLo = 0, moreThanHi = 0;
+	int i=0;
+	for (i=0;i<res->dim;i++) {
+
+		lessThanLo = d[i] < res->filter[i].lo;
+		moreThanHi = d[i] > res->filter[i].hi;
+		if ( lessThanLo || moreThanHi ) {
+			insert = 0;
+		}
+	}
+	return insert;
+}
+
+// Results filter which will include points inside bounds of the filter
+int res_filterBoundExclude(float* d, results_t* res) {
+	// check that item is insertable
+	int insert = 1, lessThanLo = 0, moreThanHi = 0;
+	int i=0;
+	for (i=0;i<res->dim;i++) {
+
+		lessThanLo = d[i] <= res->filter[i].lo;
+		moreThanHi = d[i] >= res->filter[i].hi;
+		if ( lessThanLo || moreThanHi ) {
+			insert = 0;
+		}
+	}
+	return insert;
+}
 
 
 
@@ -433,124 +449,136 @@ static void res_insert(results_t* res, float* d) {
 
 /* * * * * * * * * * * * * * * * * * * * * * *  PRIVATE FUNCTIONS (BALANCING) */
 
+/*	Input imbalance visualisation:
+ *
+ *  Left outer |  Left inner | Right outer | Right inner |
+ *		 a     |       a     |     a       |     a       |
+ *	    /      |      /      |      \      |      \      |
+ *     b       |     b       |       b     |       b     |
+ *    /        |      \      |        \    |      /      |
+ *   c         |       c     |         c   |     c       |
+ *             |             |             |             |
+ */
+
+
 // Correct imbalances in the tree
-static void bst_balance( bst_t*bst, node_t* node_a, int dataIndex ) {
+static void bst_balance( bst_t*bst, node_t* a, int dataIndex ) {
 
 	assert(bst != NULL);
-	assert(node_a != NULL);
+	assert(a != NULL);
 
-	int a_depDiff = node_a->depth_R[dataIndex] - node_a->depth_L[dataIndex];
+	int a_depDiff = a->depth_R[dataIndex] - a->depth_L[dataIndex];
 	int r_depDiff = 0;
 	int l_depDiff = 0;
 
-	if ( a_depDiff >= BST_BALANCE_THRESH ) {
+	if ( a_depDiff >= BST_BALANCE_A ) {
 
-		assert(node_a->right[dataIndex] != NULL);
-		r_depDiff = node_a->right[dataIndex]->depth_R[dataIndex]
-												- node_a->depth_L[dataIndex];
-		if ( r_depDiff > 0) {
-			bst_rightOuterRot(bst, node_a, dataIndex);
+		r_depDiff = 
+			a->right[dataIndex]->depth_R[dataIndex] - a->depth_L[dataIndex];
+
+		if ( r_depDiff >= BST_BALANCE_B) {
+			bst_rightOuterRot(bst, a, dataIndex);
 		} else {
-			bst_rightInnerRot(bst, node_a, dataIndex);
+			bst_rightInnerRot(bst, a, dataIndex);
 		}
 
-	} else if ( a_depDiff <= -BST_BALANCE_THRESH){
+	} else if ( a_depDiff <= -BST_BALANCE_A){
 
-		assert(node_a->left[dataIndex] != NULL);
-		l_depDiff = node_a->left[dataIndex]->depth_R[dataIndex]
-												- node_a->depth_L[dataIndex];
-		if ( l_depDiff < 0) {
-			bst_leftOuterRot(bst, node_a, dataIndex);
+		l_depDiff =
+			a->left[dataIndex]->depth_R[dataIndex] - a->depth_L[dataIndex];
+
+		if ( l_depDiff <= -BST_BALANCE_B) {
+			bst_leftOuterRot(bst, a, dataIndex);
 		} else {
-			bst_leftInnerRot(bst, node_a, dataIndex);
+			bst_leftInnerRot(bst, a, dataIndex);
 		}
 	}
 }
 
 // Left outer rotation balancing
-static node_t* bst_leftOuterRot(bst_t* bst, node_t* node_a, int dataIndex) {
+static node_t* bst_leftOuterRot(bst_t* bst, node_t* a, int dataIndex) {
 
 	assert(bst != NULL);
-	assert(node_a!=NULL);
-	assert(node_a->left[dataIndex]!=NULL);
-	node_t* node_b = node_a->left[dataIndex];
-	node_t* parent = node_a->parent[dataIndex];
+	assert(a!=NULL);
+	assert(a->left[dataIndex]!=NULL);
+	node_t* b = a->left[dataIndex];
+	node_t* parent = a->parent[dataIndex];
 
 	// a.left points to b.right
-	if (node_b->right[dataIndex] != NULL) {
-		node_a->left[dataIndex] = node_b->right[dataIndex];
-		node_a->left[dataIndex]->parent[dataIndex] = node_a;
-		node_a->depth_L[dataIndex] = 1 + node_maxDepth(node_a->left[dataIndex], dataIndex);
+	if (b->right[dataIndex] != NULL) {
+		a->left[dataIndex] = b->right[dataIndex];
+		a->left[dataIndex]->parent[dataIndex] = a;
+		a->depth_L[dataIndex] = 1 + node_maxDepth(a->left[dataIndex], dataIndex);
 	} else {
-		node_a->left[dataIndex] = NULL;
-		node_a->depth_L[dataIndex] = 0;
+		a->left[dataIndex] = NULL;
+		a->depth_L[dataIndex] = 0;
 	}
 	
 	// b.right points to a
-	node_b->right[dataIndex] = node_a;
-	node_b->right[dataIndex]->parent[dataIndex] = node_b;
-	node_b->depth_R[dataIndex] = 1 + node_maxDepth(node_b->right[dataIndex], dataIndex);
+	b->right[dataIndex] = a;
+	b->right[dataIndex]->parent[dataIndex] = b;
+	b->depth_R[dataIndex] = 1 + node_maxDepth(b->right[dataIndex], dataIndex);
 	
 	// parent now points to b
 	if (parent != NULL) {
-		if (parent->left[dataIndex] == node_a) {
-			parent->left[dataIndex] = node_b;
-			node_b->parent[dataIndex] = parent;
-		} else if (parent->right[dataIndex] == node_a) {
-			parent->right[dataIndex] = node_b;
-			node_b->parent[dataIndex] = parent;
+		if (parent->left[dataIndex] == a) {
+			parent->left[dataIndex] = b;
+			b->parent[dataIndex] = parent;
+		} else if (parent->right[dataIndex] == a) {
+			parent->right[dataIndex] = b;
+			b->parent[dataIndex] = parent;
 		} else {
 			exit(EXIT_FAILURE);
 		}
 	} else { // must account for when node_a is the bst root and parent==NULL
-		bst->root[dataIndex] = node_b;
-		node_b->parent[dataIndex] = NULL;
+		bst->root[dataIndex] = b;
+		b->parent[dataIndex] = NULL;
 	}
-	fixParentDepth(bst, node_b, dataIndex);
-	return node_b;
+	fixParentDepth(bst, b, dataIndex);
+	return b;
 }
 
 // Right outer rotation balancing
-static node_t* bst_rightOuterRot(bst_t* bst, node_t* node_a, int dataIndex) {
+static node_t* bst_rightOuterRot(bst_t* bst, node_t* a, int dataIndex) {
 	
 	assert(bst != NULL);
-	assert(node_a!=NULL);
-	assert(node_a->right[dataIndex]!=NULL);
-	node_t* node_b = node_a->right[dataIndex];
-	node_t* parent = node_a->parent[dataIndex];
+	assert(a!=NULL);
+	assert(a->right[dataIndex]!=NULL);
+	node_t* b = a->right[dataIndex];
+	node_t* parent = a->parent[dataIndex];
 
 	// a.right points to b.left
-	if (node_b->left[dataIndex]!= NULL) {
-		node_a->right[dataIndex] = node_b->left[dataIndex];
-		(node_a->right[dataIndex])->parent[dataIndex] = node_a;
-		node_a->depth_R[dataIndex] = 1 + node_maxDepth(node_a->right[dataIndex], dataIndex);
+	if (b->left[dataIndex]!= NULL) {
+		a->right[dataIndex] = b->left[dataIndex];
+		(a->right[dataIndex])->parent[dataIndex] = a;
+		a->depth_R[dataIndex] = 1 + node_maxDepth(a->right[dataIndex], dataIndex);
 	} else {
-		node_a->right[dataIndex] = NULL;
-		node_a->depth_R[dataIndex] = 0;
+		a->right[dataIndex] = NULL;
+		a->depth_R[dataIndex] = 0;
 	}
 	
 	// b.left points to a
-	node_b->left[dataIndex] = node_a;
-	(node_b->left[dataIndex])->parent[dataIndex] = node_b;
-	node_b->depth_L[dataIndex] = 1 + node_maxDepth(node_b->left[dataIndex], dataIndex);
+	b->left[dataIndex] = a;
+	(b->left[dataIndex])->parent[dataIndex] = b;
+	b->depth_L[dataIndex] = 1 + node_maxDepth(b->left[dataIndex], dataIndex);
 	
 	// parent now points to b
 	if (parent != NULL) {
-		if (parent->right[dataIndex] == node_a) {
-			parent->right[dataIndex] = node_b;
-			node_b->parent[dataIndex] = parent;
-		} else if (parent->left[dataIndex] == node_a) {
-			parent->left[dataIndex] = node_b;
-			node_b->parent[dataIndex] = parent;
+		if (parent->right[dataIndex] == a) {
+			parent->right[dataIndex] = b;
+			b->parent[dataIndex] = parent;
+		} else if (parent->left[dataIndex] == a) {
+			parent->left[dataIndex] = b;
+			b->parent[dataIndex] = parent;
 		} else {
 			exit(EXIT_FAILURE);
 		}
 	} else { // must account for when node_a is the bst root and parent==NULL
-		bst->root[dataIndex] = node_b;
-		node_b->parent[dataIndex] = NULL;
+		bst->root[dataIndex] = b;
+		b->parent[dataIndex] = NULL;
 	}
-	fixParentDepth(bst, node_b, dataIndex);
-	return node_b;
+	fixParentDepth(bst, b, dataIndex);
+	return b;
 }
 
 // Left inner rotation balancing
@@ -682,7 +710,7 @@ static int node_maxDepth(node_t* node, int dataIndex) {
 	return MAX(node->depth_L[dataIndex], node->depth_R[dataIndex]);
 }
 
-// Propogates a change in depth up the tree
+// Propogates a change in depth up the tree towards the root
 static void fixParentDepth(bst_t* bst, node_t* node_a, int dataIndex) {
 	
 	node_t* parent = node_a->parent[dataIndex];
